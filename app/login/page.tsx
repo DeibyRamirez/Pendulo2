@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
 import { iniciarSesion } from '../services/authService';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 
 export default function LoginPage() {
-  const navegar = useRouter();
+  const router = useRouter();
 
   // Estado del formulario
   const [email, setEmail]           = useState('');
@@ -50,23 +51,26 @@ export default function LoginPage() {
   /**
    * Maneja el envío del formulario de login.
    */
-  async function manejarLogin(evento: React.FormEvent<HTMLFormElement>): Promise<void> {
-    evento.preventDefault();
-    setError('');
-    setIsLoading(true);
+   async function manejarLogin(evento: React.FormEvent<HTMLFormElement>): Promise<void> {
+     evento.preventDefault();
+     setError('');
+     setIsLoading(true);
 
-    try {
-      await iniciarSesion(email, password);
-      // Login exitoso: redirigir al dashboard principal
-      navegar.push('/app/dashboard');
-    } catch (err) {
-      // Mostrar error traducido al usuario
-      const authError = err as AuthError;
-      setError(traducirError(authError.code));
-    } finally {
-      setIsLoading(false);
-    }
-  }
+     try {
+       await iniciarSesion(email, password);
+       // Login exitoso: esperar un poco para que el hook useAuth se actualice
+       // y luego redirigir según el rol
+       setTimeout(() => {
+         router.push('/dashboard');
+       }, 500);
+     } catch (err) {
+       // Mostrar error traducido al usuario
+       const authError = err as AuthError;
+       setError(traducirError(authError.code));
+     } finally {
+       setIsLoading(false);
+     }
+   }
 
 
   return (
@@ -217,8 +221,5 @@ export default function LoginPage() {
       </div>
     </div>
   )
-}
-function useNavigate() {
-  throw new Error('Function not implemented.');
 }
 
