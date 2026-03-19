@@ -39,9 +39,10 @@ export async function iniciarSesion(email, password) {
  * @param {string} password - Contraseña (mínimo 6 caracteres)
  * @param {string} nombre   - Nombre completo para mostrar
  * @param {string} rol      - Rol asignado: 'estudiante' | 'docente' | 'admin'
+ * @param {string} institucion - Institución educativa a la que pertenece el usuario
  * @returns {Promise} Credencial de Firebase con el usuario creado
  */
-export async function registrarUsuario(email, password, nombre, rol = 'estudiante') {
+export async function registrarUsuario(email, password, nombre, rol = 'estudiante', institucion) {
   // Crear la cuenta en Firebase Auth
   const credencial = await createUserWithEmailAndPassword(auth, email, password);
 
@@ -56,6 +57,7 @@ export async function registrarUsuario(email, password, nombre, rol = 'estudiant
     nombre:     nombre,
     rol:        rol,
     creadoEn:   new Date().toISOString(),
+    institucion: institucion,
   });
 
   return credencial;

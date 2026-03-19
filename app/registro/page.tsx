@@ -12,11 +12,11 @@ import { Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react"
 import { registrarUsuario } from "@/app/services/authService"
 
 const INSTITUCIONES = [
-  { value: "uac", label: "Corporación Universitaria Autónoma del Cauca" },
-  { value: "uniandes", label: "Universidad de los Andes" },
-  { value: "unal", label: "Universidad Nacional de Colombia" },
-  { value: "upc", label: "Universitat Politècnica de Catalunya" },
-  { value: "mit", label: "Massachusetts Institute of Technology" },
+  { value: "Corporación Universitaria Autónoma del Cauca", label: "Corporación Universitaria Autónoma del Cauca" },
+  { value: "Universidad de los Andes", label: "Universidad de los Andes" },
+  { value: "Universidad Nacional de Colombia", label: "Universidad Nacional de Colombia" },
+  { value: "Universitat Politècnica de Catalunya", label: "Universitat Politècnica de Catalunya" },
+  { value: "Massachusetts Institute of Technology", label: "Massachusetts Institute of Technology" },
   { value: "otra", label: "Otra institución de la red WPA" }
 ]
 
@@ -74,7 +74,7 @@ export default function RegistroPage() {
 
      try {
        // Registro real con Firebase Auth
-       await registrarUsuario(formData.email, formData.password, formData.nombre, formData.rol)
+       await registrarUsuario(formData.email, formData.password, formData.nombre, formData.rol, formData.institucion),
        setStep(3)
      } catch (error: any) {
        // Manejar errores de Firebase
