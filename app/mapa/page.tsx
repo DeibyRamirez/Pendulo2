@@ -1,8 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import dynamic from "next/dynamic"
+import type { ComponentProps } from "react"
+import type MapaLeafletType from "@/components/mapa-leaflet"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -19,24 +21,20 @@ import {
   Radio
 } from "lucide-react"
 
-// Dynamic import for Leaflet (client-side only)
-const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false }
-)
-const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false }
-)
-const Marker = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Marker),
-  { ssr: false }
-)
-const Popup = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Popup),
-  { ssr: false }
-)
 
+// ✅ Agrega este único import dinámico:
+
+const MapaLeaflet = dynamic<ComponentProps<typeof MapaLeafletType>>(
+  () => import("@/components/mapa-leaflet"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="absolute inset-0 flex items-center justify-center bg-background">
+        <p className="text-muted-foreground text-sm">Cargando mapa...</p>
+      </div>
+    ),
+  }
+)
 // Datos de péndulos de la red WPA
 const PENDULOS_WPA = [
   {
@@ -244,11 +242,10 @@ export default function MapaWPAPage() {
               <button
                 key={pendulo.id}
                 onClick={() => setSelectedPendulo(pendulo)}
-                className={`w-full p-4 rounded-lg border transition-all text-left ${
-                  selectedPendulo?.id === pendulo.id
-                    ? "border-primary bg-primary/10"
-                    : "border-border bg-card/50 hover:bg-card hover:border-border/80"
-                }`}
+                className={`w-full p-4 rounded-lg border transition-all text-left ${selectedPendulo?.id === pendulo.id
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-card/50 hover:bg-card hover:border-border/80"
+                  }`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -279,139 +276,20 @@ export default function MapaWPAPage() {
           </div>
         </aside>
 
+
         {/* Map */}
-        <main className="flex-1 relative">
-          {typeof window !== "undefined" && (
-            <link
-              rel="stylesheet"
-              href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-              integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-              crossOrigin=""
+        <main className="flex-1 relative overflow-hidden">
+
+          {/* Mapa al fondo, sin padding que lo corte */}
+          <div className="absolute inset-0 z-0">
+            <MapaLeaflet
+              pendulos={filteredPendulos}
+              onSelect={setSelectedPendulo}
             />
-          )}
-          
-          <div className="absolute inset-0" suppressHydrationWarning>
-            {typeof window !== "undefined" && (
-              <MapContainer
-                center={[20, 0]}
-                zoom={2}
-                style={{ height: "100%", width: "100%" }}
-                className="z-0"
-                whenReady={() => setIsMapReady(true)}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                />
-                {isMapReady && filteredPendulos.map((pendulo) => (
-                  <Marker
-                    key={pendulo.id}
-                    position={[pendulo.latitud, pendulo.longitud]}
-                    eventHandlers={{
-                      click: () => setSelectedPendulo(pendulo)
-                    }}
-                  >
-                    <Popup>
-                      <div className="p-2 min-w-[200px]">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className={`w-2 h-2 rounded-full ${getEstadoColor(pendulo.estado)}`} />
-                          <span className="font-medium text-sm">{pendulo.institucion}</span>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-2">
-                          {pendulo.ciudad}, {pendulo.pais}
-                        </p>
-                        <div className="flex gap-2">
-                          <a
-                            href={`/dashboard?pendulo=${pendulo.id}`}
-                            className="text-xs bg-blue-500 text-white px-2 py-1 rounded"
-                          >
-                            Ver Dashboard
-                          </a>
-                          <a
-                            href={`/reservas?pendulo=${pendulo.id}`}
-                            className="text-xs bg-green-500 text-white px-2 py-1 rounded"
-                          >
-                            Agendar
-                          </a>
-                        </div>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
-            )}
           </div>
 
-          {/* Selected Pendulo Card */}
-          {selectedPendulo && (
-            <Card className="absolute bottom-6 left-6 right-6 md:left-auto md:right-6 md:w-96 z-10 border-border bg-card/95 backdrop-blur-sm">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      {getEstadoBadge(selectedPendulo.estado)}
-                    </div>
-                    <CardTitle className="text-lg">{selectedPendulo.institucion}</CardTitle>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                      <MapPin className="w-3 h-3" />
-                      {selectedPendulo.ciudad}, {selectedPendulo.pais}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedPendulo(null)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-lg bg-secondary/50">
-                    <p className="text-xs text-muted-foreground mb-1">Usuarios Activos</p>
-                    <p className="text-xl font-bold">{selectedPendulo.usuariosActivos}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-secondary/50">
-                    <p className="text-xs text-muted-foreground mb-1">Sesiones Hoy</p>
-                    <p className="text-xl font-bold">{selectedPendulo.sesionesHoy}</p>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Última actualización: {new Date(selectedPendulo.ultimaActualizacion).toLocaleString("es-CO")}
-                </p>
-                <div className="flex gap-2">
-                  {selectedPendulo.estado !== "En_mantenimiento" && (
-                    <>
-                      <Link href={`/dashboard?pendulo=${selectedPendulo.id}`} className="flex-1">
-                        <Button className="w-full" size="sm">
-                          <Activity className="w-4 h-4 mr-2" />
-                          Ver Dashboard
-                        </Button>
-                      </Link>
-                      {selectedPendulo.estado === "Activo" && (
-                        <Link href={`/reservas?pendulo=${selectedPendulo.id}`} className="flex-1">
-                          <Button variant="outline" className="w-full" size="sm">
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Agendar
-                          </Button>
-                        </Link>
-                      )}
-                    </>
-                  )}
-                  {selectedPendulo.estado === "En_mantenimiento" && (
-                    <p className="text-sm text-muted-foreground text-center w-full py-2">
-                      Este péndulo está en mantenimiento
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Legend */}
-          <div className="absolute top-4 right-4 p-3 rounded-lg bg-card/90 backdrop-blur-sm border border-border z-10">
+          {/* Legend — z-index alto para que flote sobre el mapa */}
+          <div className="absolute top-4 left-4 p-3 rounded-lg bg-card/90 backdrop-blur-sm border border-border z-[400]">
             <p className="text-xs font-medium mb-2">Estado del Péndulo</p>
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 text-xs">
@@ -428,6 +306,76 @@ export default function MapaWPAPage() {
               </div>
             </div>
           </div>
+
+          {/* Card de péndulo seleccionado — z-index alto, pegada abajo */}
+          {selectedPendulo && (
+            <div className="absolute bottom-0 left-0 right-0 z-[400] p-4">
+              <Card className="border-border bg-card/98 backdrop-blur-sm shadow-lg">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {getEstadoBadge(selectedPendulo.estado)}
+                      </div>
+                      <CardTitle className="text-base truncate">{selectedPendulo.institucion}</CardTitle>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                        <MapPin className="w-3 h-3 flex-shrink-0" />
+                        {selectedPendulo.ciudad}, {selectedPendulo.pais}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedPendulo(null)}
+                      className="text-muted-foreground hover:text-foreground ml-2 flex-shrink-0"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="grid grid-cols-4 gap-2 mb-3">
+                    <div className="p-2 rounded-lg bg-secondary/50 text-center">
+                      <p className="text-xs text-muted-foreground">Usuarios</p>
+                      <p className="text-lg font-bold">{selectedPendulo.usuariosActivos}</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-secondary/50 text-center">
+                      <p className="text-xs text-muted-foreground">Sesiones hoy</p>
+                      <p className="text-lg font-bold">{selectedPendulo.sesionesHoy}</p>
+                    </div>
+                    <div className="col-span-2 flex gap-2 items-center">
+                      {selectedPendulo.estado !== "En_mantenimiento" && (
+                        <>
+                          <Link href={`/dashboard?pendulo=${selectedPendulo.id}`} className="flex-1">
+                            <Button className="w-full" size="sm">
+                              <Activity className="w-3 h-3 mr-1" />
+                              Dashboard
+                            </Button>
+                          </Link>
+                          {selectedPendulo.estado === "Activo" && (
+                            <Link href={`/reservas?pendulo=${selectedPendulo.id}`} className="flex-1">
+                              <Button variant="outline" className="w-full" size="sm">
+                                <Calendar className="w-3 h-3 mr-1" />
+                                Agendar
+                              </Button>
+                            </Link>
+                          )}
+                        </>
+                      )}
+                      {selectedPendulo.estado === "En_mantenimiento" && (
+                        <p className="text-sm text-muted-foreground text-center w-full">
+                          En mantenimiento
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Actualizado: {new Date(selectedPendulo.ultimaActualizacion).toLocaleString("es-CO")}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </main>
       </div>
     </div>
