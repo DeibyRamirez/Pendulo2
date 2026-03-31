@@ -69,8 +69,8 @@ export default function DashboardDocentePage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Observa el movimiento del péndulo, ángulo, velocidad y oscilaciones en tiempo real con gráficas interactivas.
                 </p>
-                <Link href="/pendulo">
-                  <Button className="w-full">Ver Dashboard</Button>
+                <Link href="/mapa">
+                  <Button className="w-full">Ver Mapa</Button>
                 </Link>
               </CardContent>
             </Card>
@@ -137,7 +137,7 @@ export default function DashboardDocentePage() {
             </Card>
           </div>
 
-          {/* Live Preview Section */}
+          {/* Live Preview Section
           <Card className="mb-8 border-border/50">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -168,7 +168,7 @@ export default function DashboardDocentePage() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* Estadísticas de Clase */}
           <Card className="border-border/50 bg-card/30">

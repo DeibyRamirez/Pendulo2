@@ -5,24 +5,60 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { 
   Activity, 
-  Pause, 
   Play, 
-  RotateCcw,
   Download,
   Maximize2,
-  Settings2
+  Settings2,
+  Lock,
+  CheckCircle2
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { PendulumChart } from "@/components/pendulum-chart"
 import { PendulumVisualization } from "@/components/pendulum-visualization"
 import { CameraStream } from "@/components/camera-stream"
+import { useAuth } from "@/hooks/useAuth"
+import { escucharReservacionesUsuario } from "@/app/services/reservacionService"
+import type { Timestamp } from "firebase/firestore"
+
+interface Reservacion {
+  id: string
+  usuario_id: string
+  inicio_sesion_reserva: Timestamp
+  final_sesion_reserva: Timestamp
+  estado: "pending" | "active" | "completed" | "cancelled"
+}
+
+function toDate(value: Timestamp | Date): Date {
+  if (value instanceof Date) return value
+  return value?.toDate?.() ?? new Date()
+}
 
 export default function RealtimePage() {
-  const [isRunning, setIsRunning] = useState(true)
+  const { user } = useAuth()
+  const [isRunning, setIsRunning] = useState(false)
   const [currentAngle, setCurrentAngle] = useState(15.7)
   const [currentVelocity, setCurrentVelocity] = useState(0.42)
   const [currentPeriod] = useState(2.01)
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [reservaciones, setReservaciones] = useState<Reservacion[]>([])
+
+  useEffect(() => {
+    if (!user?.uid) return
+    const unsub = (escucharReservacionesUsuario as unknown as (uid: string, cb: (data: Reservacion[]) => void) => () => void)(
+      user.uid,
+      (data) => setReservaciones(data)
+    )
+    return () => unsub()
+  }, [user?.uid])
+
+  const ahora = new Date()
+  const reservaEnTurno = reservaciones.find((r) => {
+    if (r.estado !== "pending" && r.estado !== "active") return false
+    const inicio = toDate(r.inicio_sesion_reserva)
+    const fin = toDate(r.final_sesion_reserva)
+    return ahora >= inicio && ahora <= fin
+  })
+  const puedeIniciar = !!reservaEnTurno
 
   useEffect(() => {
     if (!isRunning) return
@@ -39,10 +75,20 @@ export default function RealtimePage() {
     return () => clearInterval(interval)
   }, [isRunning, elapsedTime])
 
-  const handleReset = () => {
+  const handleStartPractice = () => {
+    if (!puedeIniciar) return
+    setIsRunning(true)
+  }
+
+  const handleEndPractice = () => {
+    setIsRunning(false)
+  }
+
+  const handleStopData = () => {
     setElapsedTime(0)
     setCurrentAngle(15.7)
     setCurrentVelocity(0.42)
+    setIsRunning(false)
   }
 
   return (
@@ -58,6 +104,9 @@ export default function RealtimePage() {
             </Badge>
           </div>
           <p className="text-muted-foreground mt-1">Monitorea los datos del péndulo en tiempo real</p>
+          <p className="text-xs text-muted-foreground mt-2">
+            Esta vista se usa durante tu franja reservada. El inicio de la práctica envía la señal al controlador del péndulo (Raspberry Pi).
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="icon">
@@ -79,24 +128,20 @@ export default function RealtimePage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Button
-                variant={isRunning ? "destructive" : "default"}
-                onClick={() => setIsRunning(!isRunning)}
+                variant={isRunning ? "secondary" : "default"}
+                onClick={handleStartPractice}
+                disabled={!puedeIniciar || isRunning}
               >
-                {isRunning ? (
-                  <>
-                    <Pause className="mr-2 h-4 w-4" />
-                    Pausar
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    Reanudar
-                  </>
-                )}
+                <Play className="mr-2 h-4 w-4" />
+                Iniciar práctica
               </Button>
-              <Button variant="outline" onClick={handleReset}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Reiniciar
+              <Button variant="outline" onClick={handleEndPractice} disabled={!isRunning}>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Finalizar práctica
+              </Button>
+              <Button variant="outline" onClick={handleStopData}>
+                <Lock className="mr-2 h-4 w-4" />
+                Limpiar datos locales
               </Button>
             </div>
             <div className="flex items-center gap-6 text-sm">
@@ -108,8 +153,19 @@ export default function RealtimePage() {
                 <span className="text-muted-foreground">Frecuencia de muestreo:</span>
                 <span className="font-mono font-medium text-foreground">10 Hz</span>
               </div>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Estado de turno:</span>
+                <span className="font-medium text-foreground">
+                  {puedeIniciar ? "Habilitado" : "Fuera de turno"}
+                </span>
+              </div>
             </div>
           </div>
+          {!puedeIniciar && (
+            <p className="mt-3 text-xs text-amber-600">
+              El botón "Iniciar práctica" solo se habilita cuando tienes una reserva activa en este momento.
+            </p>
+          )}
         </CardContent>
       </Card>
 

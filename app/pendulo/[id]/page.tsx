@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect, use, useMemo } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,9 +13,7 @@ import {
   RotateCcw,
   MapPin,
   LogIn,
-  QrCode,
-  Share2,
-  ExternalLink
+  LayoutDashboard
 } from "lucide-react"
 import {
   LineChart,
@@ -26,7 +24,9 @@ import {
   Tooltip,
   ResponsiveContainer
 } from "recharts"
-import { QRCodeSVG } from "qrcode.react"
+import { usePendulos } from "@/hooks/usePendulos"
+import { useAuth } from "@/hooks/useAuth"
+import { getDashboardPathByRole } from "@/lib/roles"
 
 // Datos simulados del péndulo
 const generateOscillationData = () => {
@@ -42,24 +42,14 @@ const generateOscillationData = () => {
   return data
 }
 
-const PENDULO_INFO = {
-  id: "uac-001",
-  institucion: "Corporación Universitaria Autónoma del Cauca",
-  ubicacion: "Laboratorio de Física - Edificio B, Piso 2",
-  ciudad: "Popayán, Cauca",
-  pais: "Colombia",
-  estado: "Activo",
-  longitudPendulo: "1.2 m",
-  masaEsfera: "0.5 kg",
-  gravedadLocal: "9.78 m/s²"
-}
-
 export default function PenduloPublicoPage({
   params
 }: {
   params: Promise<{ id: string }>
 }) {
   const resolvedParams = use(params)
+  const { user, rol } = useAuth()
+  const { pendulos } = usePendulos()
   const [oscillationData, setOscillationData] = useState(generateOscillationData())
   const [currentValues, setCurrentValues] = useState({
     angulo: 12.5,
@@ -67,7 +57,30 @@ export default function PenduloPublicoPage({
     oscilaciones: 156,
     periodo: 2.19
   })
-  const [showQR, setShowQR] = useState(false)
+
+  const penduloSeleccionado = useMemo(() => {
+    const byId = pendulos.find((p) => p.id === resolvedParams.id)
+    if (byId) return byId
+    const byPenduloId = pendulos.find((p) => p.pendulo_id === resolvedParams.id)
+    if (byPenduloId) return byPenduloId
+    const numericId = Number(resolvedParams.id)
+    if (!Number.isNaN(numericId) && numericId >= 1 && numericId <= pendulos.length) {
+      return pendulos[numericId - 1]
+    }
+    return null
+  }, [pendulos, resolvedParams.id])
+
+  const penduloInfo = {
+    id: penduloSeleccionado?.pendulo_id || resolvedParams.id,
+    institucion: penduloSeleccionado?.institucion || "Péndulo no registrado",
+    ubicacion: "Laboratorio de Física",
+    ciudad: "Nodo WPA",
+    pais: penduloSeleccionado?.pais || "Sin país",
+    estado: penduloSeleccionado?.estado || "Inactivo",
+    longitudPendulo: "1.2 m",
+    masaEsfera: "0.5 kg",
+    gravedadLocal: "9.78 m/s²",
+  }
 
   // Simulación de actualización en tiempo real
   useEffect(() => {
@@ -83,10 +96,6 @@ export default function PenduloPublicoPage({
     return () => clearInterval(interval)
   }, [])
 
-  const qrUrl = typeof window !== "undefined" 
-    ? `${window.location.origin}/pendulo/${resolvedParams.id}` 
-    : ""
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -101,26 +110,32 @@ export default function PenduloPublicoPage({
               </svg>
             </div>
             <div>
-              <h1 className="font-semibold">Péndulo UAC</h1>
+               <h1 className="font-semibold">Péndulo {penduloInfo.id}</h1>
               <p className="text-xs text-muted-foreground">World Pendulum Alliance</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setShowQR(!showQR)}>
-              <QrCode className="w-5 h-5" />
-            </Button>
-            <Link href="/login">
-              <Button size="sm">
-                <LogIn className="w-4 h-4 mr-2" />
-                Iniciar Sesión
-              </Button>
-            </Link>
+            {user ? (
+              <Link href={`/${getDashboardPathByRole(rol)}`}>
+                <Button size="sm" variant="outline">
+                  <LayoutDashboard className="w-4 h-4 mr-2" />
+                  Ir a mi panel
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/login">
+                <Button size="sm">
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Iniciar Sesión
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {/* Info Banner */}
+        {/* Info Banner
         <div className="mb-8 p-4 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
@@ -144,49 +159,7 @@ export default function PenduloPublicoPage({
               </Button>
             </Link>
           </div>
-        </div>
-
-        {/* QR Modal */}
-        {showQR && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <Card className="w-full max-w-sm">
-              <CardHeader>
-                <CardTitle className="text-center">Código QR del Péndulo</CardTitle>
-              </CardHeader>
-              <CardContent className="text-center space-y-4">
-                <div className="w-48 h-48 mx-auto bg-white p-4 rounded-lg flex items-center justify-center">
-                  <QRCodeSVG 
-                    value={qrUrl || "https://wpa-uac.vercel.app/pendulo/uac-001"} 
-                    size={160}
-                    level="H"
-                    includeMargin={false}
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Escanea este código para acceder directamente al péndulo
-                </p>
-                <div className="flex items-center gap-2 p-2 rounded bg-secondary/50">
-                  <input
-                    type="text"
-                    value={qrUrl}
-                    readOnly
-                    className="flex-1 bg-transparent text-sm text-center outline-none"
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => navigator.clipboard.writeText(qrUrl)}
-                  >
-                    <Share2 className="w-4 h-4" />
-                  </Button>
-                </div>
-                <Button variant="outline" onClick={() => setShowQR(false)} className="w-full">
-                  Cerrar
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        </div> */}
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Info del Péndulo */}
@@ -195,22 +168,22 @@ export default function PenduloPublicoPage({
               <div className="flex items-center justify-between">
                 <CardTitle>Información del Péndulo</CardTitle>
                 <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                  {PENDULO_INFO.estado}
+                  {penduloInfo.estado}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground">Institución</p>
-                <p className="font-medium">{PENDULO_INFO.institucion}</p>
+                <p className="font-medium">{penduloInfo.institucion}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Ubicación</p>
-                <p className="font-medium">{PENDULO_INFO.ubicacion}</p>
+                <p className="font-medium">{penduloInfo.ubicacion}</p>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <MapPin className="w-4 h-4" />
-                {PENDULO_INFO.ciudad}, {PENDULO_INFO.pais}
+                {penduloInfo.ciudad}, {penduloInfo.pais}
               </div>
 
               <div className="pt-4 border-t border-border space-y-3">
@@ -218,26 +191,35 @@ export default function PenduloPublicoPage({
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground">Longitud</p>
-                    <p className="font-medium">{PENDULO_INFO.longitudPendulo}</p>
+                      <p className="font-medium">{penduloInfo.longitudPendulo}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Masa</p>
-                    <p className="font-medium">{PENDULO_INFO.masaEsfera}</p>
+                      <p className="font-medium">{penduloInfo.masaEsfera}</p>
                   </div>
                   <div className="col-span-2">
                     <p className="text-muted-foreground">Gravedad Local</p>
-                    <p className="font-medium">{PENDULO_INFO.gravedadLocal}</p>
+                      <p className="font-medium">{penduloInfo.gravedadLocal}</p>
                   </div>
                 </div>
               </div>
 
               <div className="pt-4 border-t border-border">
-                <Link href="/login">
-                  <Button className="w-full">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Agendar Sesión
-                  </Button>
-                </Link>
+                {user ? (
+                  <Link href="/dashboard/reservas">
+                    <Button className="w-full">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Agendar Sesión
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href="/login">
+                    <Button className="w-full">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Inicia sesión para agendar
+                    </Button>
+                  </Link>
+                )}
               </div>
             </CardContent>
           </Card>

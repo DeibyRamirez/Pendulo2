@@ -22,7 +22,6 @@ import { useAuth } from "@/hooks/useAuth"
 import {
   crearReservacion,
   cancelarReservacion,
-  escucharReservacionesUsuario,
   escucharTodasReservaciones,
 } from "@/app/services/reservacionService"
 import { escucharUsuarios } from "@/app/services/usuarioService"
@@ -78,6 +77,30 @@ function buildBookedSlots(reservaciones: Reservacion[]): Record<string, string[]
   return slots
 }
 
+function buildBookedSlotOwners(
+  reservaciones: Reservacion[],
+  currentUserId?: string
+): Record<string, Record<string, "mine" | "occupied">> {
+  const slots: Record<string, Record<string, "mine" | "occupied">> = {}
+
+  reservaciones
+    .filter((r) => r.estado === "pending" || r.estado === "active")
+    .forEach((r) => {
+      const inicio = toDate(r.inicio_sesion_reserva)
+      const key = `${inicio.getFullYear()}-${inicio.getMonth() + 1}-${inicio.getDate()}`
+      const timeStr = inicio.toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      })
+
+      if (!slots[key]) slots[key] = {}
+      slots[key][timeStr] = r.usuario_id === currentUserId ? "mine" : "occupied"
+    })
+
+  return slots
+}
+
 export default function ReservasPage() {
   const { user, rol } = useAuth()
   const esDocenteOAdmin = rol === "Docente" || rol === "Admin"
@@ -95,18 +118,12 @@ export default function ReservasPage() {
   useEffect(() => {
     if (!user?.uid) return
 
-    if (esDocenteOAdmin) {
-      const unsub = escucharTodasReservaciones((data: Reservacion[]) => {
-        setReservaciones(data)
-      })
-      return () => unsub()
-    }
-
-    const unsub = escucharReservacionesUsuario(user.uid, (data: Reservacion[]) => {
+    const unsub = escucharTodasReservaciones((data: Reservacion[]) => {
       setReservaciones(data)
     })
+
     return () => unsub()
-  }, [user?.uid, esDocenteOAdmin])
+  }, [user?.uid])
 
   useEffect(() => {
     if (!esDocenteOAdmin) return
@@ -123,6 +140,7 @@ export default function ReservasPage() {
   }, [esDocenteOAdmin])
 
   const bookedSlots = buildBookedSlots(reservaciones)
+  const bookedSlotOwners = buildBookedSlotOwners(reservaciones, user?.uid)
 
   const getDaysInMonth = (date: Date) => ({
     firstDay: new Date(date.getFullYear(), date.getMonth(), 1).getDay(),
@@ -157,6 +175,12 @@ export default function ReservasPage() {
     if (!selectedDate) return false
     const key = `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1}-${selectedDate.getDate()}`
     return bookedSlots[key]?.includes(time) || false
+  }
+
+  const getSlotOwnerType = (time: string) => {
+    if (!selectedDate) return null
+    const key = `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1}-${selectedDate.getDate()}`
+    return bookedSlotOwners[key]?.[time] || null
   }
 
   const formatSelectedDate = () => {
@@ -205,9 +229,9 @@ export default function ReservasPage() {
   }
 
   const exportToCSV = () => {
-    const activas = reservaciones.filter(
-      (r) => r.estado === "pending" || r.estado === "active"
-    )
+    const activas = reservaciones
+      .filter((r) => r.estado === "pending" || r.estado === "active")
+      .filter((r) => (esDocenteOAdmin ? true : r.usuario_id === user?.uid))
     if (activas.length === 0) {
       alert("No hay reservaciones activas para exportar")
       return
@@ -256,6 +280,8 @@ export default function ReservasPage() {
         toDate(a.inicio_sesion_reserva).getTime() -
         toDate(b.inicio_sesion_reserva).getTime()
     )
+
+  const misReservasPropias = misReservasActivas.filter((r) => r.usuario_id === user?.uid)
 
   return (
     <main className="min-h-screen bg-background">
@@ -371,6 +397,18 @@ export default function ReservasPage() {
                     <div className="h-1.5 w-1.5 rounded-full bg-chart-4" />
                     <span className="text-muted-foreground">Con reservas</span>
                   </div>
+                  {!esDocenteOAdmin && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-3 rounded bg-primary/25" />
+                        <span className="text-muted-foreground">Mi reserva</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-3 rounded bg-red-500/20" />
+                        <span className="text-muted-foreground">Horario ocupado</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -393,6 +431,7 @@ export default function ReservasPage() {
                       {TIME_SLOTS.map((time) => {
                         const booked = isSlotBooked(time)
                         const selected = selectedTime === time
+                        const ownerType = getSlotOwnerType(time)
                         return (
                           <button
                             key={time}
@@ -401,7 +440,9 @@ export default function ReservasPage() {
                             className={`
                               py-2 px-3 rounded-lg text-sm font-medium transition-colors
                               ${booked
-                                ? "bg-muted text-muted-foreground cursor-not-allowed line-through opacity-50"
+                                ? ownerType === "mine"
+                                  ? "bg-primary/25 text-primary cursor-not-allowed line-through"
+                                  : "bg-red-500/20 text-red-700 cursor-not-allowed line-through"
                                 : selected
                                 ? "bg-primary text-primary-foreground"
                                 : "bg-muted/50 hover:bg-muted text-foreground"}
@@ -485,7 +526,7 @@ export default function ReservasPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {misReservasActivas.length === 0 ? (
+              {(esDocenteOAdmin ? misReservasActivas : misReservasPropias).length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
                   {esDocenteOAdmin
                     ? "No hay reservas activas registradas en este momento"
@@ -493,7 +534,7 @@ export default function ReservasPage() {
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {misReservasActivas.map((r) => {
+                  {(esDocenteOAdmin ? misReservasActivas : misReservasPropias).map((r) => {
                     const inicio = toDate(r.inicio_sesion_reserva)
                     const fin = toDate(r.final_sesion_reserva)
                     return (

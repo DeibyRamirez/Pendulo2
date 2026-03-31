@@ -27,6 +27,7 @@ const MapaLeaflet = dynamic<ComponentProps<typeof MapaLeafletType>>(
 
 type PenduloUI = {
   id: string
+  pendulo_id: string
   institucion: string
   pais: string
   ciudad: string
@@ -77,6 +78,7 @@ export default function MapaWPAPage() {
     () =>
       pendulos.map((p) => ({
         id: p.id,
+        pendulo_id: p.pendulo_id,
         institucion: p.institucion,
         pais: p.pais,
         ciudad: toCityFromInstitution(p.institucion),
@@ -197,7 +199,10 @@ export default function MapaWPAPage() {
 
         <main className="flex-1 relative overflow-hidden">
           <div className="absolute inset-0 z-0">
-            <MapaLeaflet pendulos={filteredPendulos} onSelect={setSelectedPendulo} />
+            <MapaLeaflet pendulos={filteredPendulos} onSelect={(pendulo) => {
+              const penduloUI = pendulosUI.find(p => p.id === pendulo.id);
+              if (penduloUI) setSelectedPendulo(penduloUI);
+            }} />
           </div>
 
           {selectedPendulo && (
@@ -217,10 +222,10 @@ export default function MapaWPAPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0 flex gap-2">
-                  <Link href={`/dashboard?pendulo=${selectedPendulo.id}`} className="flex-1">
+                  <Link href={`/pendulo/${selectedPendulo.pendulo_id || selectedPendulo.id}`} className="flex-1">
                     <Button className="w-full" size="sm">
                       <Activity className="w-3 h-3 mr-1" />
-                      Dashboard
+                      Visualizar
                     </Button>
                   </Link>
                   {user && selectedPendulo.estado === "Activo" && (

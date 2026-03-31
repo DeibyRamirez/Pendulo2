@@ -8,10 +8,9 @@ import {
   LayoutDashboard, 
   Calendar, 
   History, 
-  Users, 
-  Settings,
   LogOut,
   ChevronLeft,
+  ChevronRight,
   Home
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -20,10 +19,9 @@ import { useState } from "react"
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Tiempo Real", href: "/dashboard/realtime", icon: Activity },
-  { name: "Reservas", href: "/reservas", icon: Calendar },
-  { name: "Historial", href: "/historial", icon: History },
-  // { name: "Usuarios", href: "/dashboard/usuarios", icon: Users },
-  // { name: "Configuración", href: "/dashboard/configuracion", icon: Settings },
+  { name: "Reservas", href: "/dashboard/reservas", icon: Calendar },
+  { name: "Mis Reservas", href: "/dashboard/mis-reservas", icon: Calendar },
+  { name: "Historial", href: "/dashboard/historial", icon: History },
 ]
 
 export function DashboardSidebar() {
@@ -51,17 +49,19 @@ export function DashboardSidebar() {
         <Button 
           variant="ghost" 
           size="icon"
-          className={cn("text-sidebar-foreground", collapsed && "hidden")}
+          className="text-sidebar-foreground"
           onClick={() => setCollapsed(!collapsed)}
         >
-          <ChevronLeft className="h-4 w-4" />
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2">
         {navigation.map((item) => {
-          const isActive = pathname === item.href
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`))
           return (
             <Link
               key={item.name}
@@ -93,7 +93,7 @@ export function DashboardSidebar() {
           <Home className="h-5 w-5 flex-shrink-0" />
           {!collapsed && <span>Volver al inicio</span>}
         </Link>
-        <button
+        {/* <button
           className={cn(
             "flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors",
             collapsed && "justify-center px-2"
@@ -101,18 +101,8 @@ export function DashboardSidebar() {
         >
           <LogOut className="h-5 w-5 flex-shrink-0" />
           {!collapsed && <span>Cerrar sesión</span>}
-        </button>
+        </button> */}
 
-        {collapsed && (
-          <Button 
-            variant="ghost" 
-            size="icon"
-            className="w-full text-sidebar-foreground"
-            onClick={() => setCollapsed(false)}
-          >
-            <ChevronLeft className="h-4 w-4 rotate-180" />
-          </Button>
-        )}
       </div>
     </aside>
   )

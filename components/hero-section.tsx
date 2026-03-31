@@ -1,10 +1,36 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Play, QrCode } from "lucide-react"
+import { ArrowRight, Play, ChevronLeft, ChevronRight } from "lucide-react"
 import Link from "next/link"
+import { useMemo, useState } from "react"
+import { usePendulos } from "@/hooks/usePendulos"
+import { QRCodeSVG } from "qrcode.react"
+
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
 export function HeroSection() {
+  const { pendulos } = usePendulos()
+  const [index, setIndex] = useState(0)
+
+  const items = useMemo(
+    () =>
+      pendulos
+        .slice(0, 8)
+        .map((p) => ({
+          id: p.pendulo_id || p.id,
+          institucion: p.institucion,
+          latitud: p.latitud,
+          longitud: p.longitud,
+          pais: p.pais,
+          estado: p.estado
+
+        })),
+    [pendulos]
+  )
+
+  const selected = items.length > 0 ? items[index % items.length] : null
+
   return (
     <section className="relative min-h-screen overflow-hidden pt-24">
       {/* Background gradient effect */}
@@ -30,8 +56,8 @@ export function HeroSection() {
             </h1>
 
             <p className="text-lg leading-relaxed text-muted-foreground">
-              Accede al péndulo físico de la Corporación Universitaria Autónoma del Cauca 
-              desde cualquier lugar del mundo. Visualiza datos en tiempo real, agenda sesiones 
+              Accede al péndulo físico de la Corporación Universitaria Autónoma del Cauca
+              desde cualquier lugar del mundo. Visualiza datos en tiempo real, agenda sesiones
               experimentales y forma parte de la red global de laboratorios remotos.
             </p>
 
@@ -82,7 +108,7 @@ export function HeroSection() {
                 <div className="relative">
                   {/* Pivot point */}
                   <div className="h-4 w-4 rounded-full bg-primary" />
-                  
+
                   {/* Pendulum arm and bob */}
                   <div className="absolute top-2 left-1/2 -translate-x-1/2 origin-top animate-pendulum">
                     <div className="h-48 w-0.5 bg-gradient-to-b from-primary to-primary/50" />
@@ -110,16 +136,104 @@ export function HeroSection() {
                 </div>
               </div>
 
-              {/* En este apartado se agregaran unos qr de los pendulos mas usados y estos me llevara a ellos pendulo/1, pendulo/2, etc */}
-              {/* QR Code badge
-              <div className="absolute top-4 right-4 flex items-center gap-2 rounded-lg border border-border bg-background/80 backdrop-blur-sm px-3 py-2">
-                <QrCode className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">Escanea para acceder</span>
-              </div> */}
+
             </div>
           </div>
+
         </div>
+        {/* Carrusel QR de péndulos */}
+        <div className="pt-12 border-t border-border">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-6">
+            Accede a nuestros péndulos
+          </p>
+          <div className="flex items-center justify-between gap-4">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setIndex((prev) => (prev - 1 + items.length) % items.length)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="flex-1">
+              {selected ? (
+                <div className="rounded-lg border border-border bg-card p-8 flex flex-col sm:flex-row items-center justify-between gap-8">
+                  {/* QR Code - Prominent */}
+                  <div className="flex-shrink-0">
+                    <Link href={`/pendulo/${selected.id}`} className="block">
+                      <div className="rounded-lg bg-white p-6 hover:shadow-lg transition-shadow duration-300">
+                        <QRCodeSVG value={`${baseUrl}/pendulo/${selected.id}`} size={200} level="H" />
+                      </div>
+                    </Link>
+                  </div>
+
+                  {/* Information - Organized and descriptive */}
+                  <div className="flex-1 flex flex-col gap-6">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                        Institución
+                      </p>
+                      <p className="text-lg font-semibold text-foreground">
+                        {selected.institucion}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                          Estado
+                        </p>
+                        <p className="text-base font-medium text-foreground">
+                          {selected.estado}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                          País
+                        </p>
+                        <p className="text-base font-medium text-foreground">
+                          {selected.pais}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                          Latitud
+                        </p>
+                        <p className="text-sm font-mono text-primary">
+                          {selected.latitud}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                          Longitud
+                        </p>
+                        <p className="text-sm font-mono text-primary">
+                          {selected.longitud}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-8">No hay péndulos registrados</p>
+              )}
+            </div>
+
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setIndex((prev) => (prev + 1) % items.length)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
       </div>
+
 
       <style jsx>{`
         @keyframes pendulum {

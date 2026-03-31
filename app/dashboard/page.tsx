@@ -67,10 +67,10 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Observa el movimiento del péndulo, ángulo, velocidad y oscilaciones en tiempo real con gráficas interactivas.
+                  Monitorea la práctica en vivo. El inicio de práctica se habilita únicamente durante tu turno reservado.
                 </p>
-                <Link href="/pendulo/1">
-                  <Button className="w-full">Ver Dashboard</Button>
+                <Link href="/dashboard/realtime">
+                  <Button className="w-full">Ir a Tiempo Real</Button>
                 </Link>
               </CardContent>
             </Card>
@@ -90,7 +90,7 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Selecciona fecha y hora para agendar una sesión de hasta 30 minutos. Visualiza la disponibilidad en tiempo real.
                 </p>
-                <Link href="/reservas">
+                <Link href="/dashboard/reservas">
                   <Button className="w-full">Agendar</Button>
                 </Link>
               </CardContent>
@@ -111,7 +111,7 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Consulta el historial de tus reservas activas e históricas. Cancela sesiones si lo necesitas.
                 </p>
-                <Link href="/mis-reservas">
+                <Link href="/dashboard/mis-reservas">
                   <Button className="w-full" variant="outline">Ver Reservas</Button>
                 </Link>
               </CardContent>
@@ -132,7 +132,7 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Consulta el historial completo de experimentos con gráficas, datos y exportación en CSV.
                 </p>
-                <Link href="/historial">
+                <Link href="/dashboard/historial">
                   <Button className="w-full" variant="outline">Ver Historial</Button>
                 </Link>
               </CardContent>
