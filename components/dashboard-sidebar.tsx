@@ -22,8 +22,8 @@ const navigation = [
   { name: "Tiempo Real", href: "/dashboard/realtime", icon: Activity },
   { name: "Reservas", href: "/reservas", icon: Calendar },
   { name: "Historial", href: "/historial", icon: History },
-  { name: "Usuarios", href: "/dashboard/usuarios", icon: Users },
-  { name: "Configuración", href: "/dashboard/configuracion", icon: Settings },
+  // { name: "Usuarios", href: "/dashboard/usuarios", icon: Users },
+  // { name: "Configuración", href: "/dashboard/configuracion", icon: Settings },
 ]
 
 export function DashboardSidebar() {

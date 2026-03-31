@@ -23,7 +23,9 @@ import {
   crearReservacion,
   cancelarReservacion,
   escucharReservacionesUsuario,
+  escucharTodasReservaciones,
 } from "@/app/services/reservacionService"
+import { escucharUsuarios } from "@/app/services/usuarioService"
 import type { Timestamp } from "firebase/firestore"
 
 const DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
@@ -46,6 +48,11 @@ interface Reservacion {
   estado: "pending" | "active" | "completed" | "cancelled"
   institucion: string
   pendulo_id: string
+}
+
+interface UsuarioLite {
+  uid: string
+  nombre?: string
 }
 
 function toDate(value: Timestamp | Date): Date {
@@ -72,7 +79,8 @@ function buildBookedSlots(reservaciones: Reservacion[]): Record<string, string[]
 }
 
 export default function ReservasPage() {
-  const { user } = useAuth()
+  const { user, rol } = useAuth()
+  const esDocenteOAdmin = rol === "Docente" || rol === "Admin"
 
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -82,14 +90,37 @@ export default function ReservasPage() {
   const [error, setError] = useState<string | null>(null)
   const [reservaciones, setReservaciones] = useState<Reservacion[]>([])
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [usuariosMap, setUsuariosMap] = useState<Record<string, UsuarioLite>>({})
 
   useEffect(() => {
     if (!user?.uid) return
+
+    if (esDocenteOAdmin) {
+      const unsub = escucharTodasReservaciones((data: Reservacion[]) => {
+        setReservaciones(data)
+      })
+      return () => unsub()
+    }
+
     const unsub = escucharReservacionesUsuario(user.uid, (data: Reservacion[]) => {
       setReservaciones(data)
     })
     return () => unsub()
-  }, [user?.uid])
+  }, [user?.uid, esDocenteOAdmin])
+
+  useEffect(() => {
+    if (!esDocenteOAdmin) return
+
+    const unsub = (escucharUsuarios as unknown as (callback: (data: UsuarioLite[]) => void) => () => void)((data) => {
+      const mapped = data.reduce((acc, usuario) => {
+        acc[usuario.uid] = usuario
+        return acc
+      }, {} as Record<string, UsuarioLite>)
+      setUsuariosMap(mapped)
+    })
+
+    return () => unsub()
+  }, [esDocenteOAdmin])
 
   const bookedSlots = buildBookedSlots(reservaciones)
 
@@ -181,14 +212,32 @@ export default function ReservasPage() {
       alert("No hay reservaciones activas para exportar")
       return
     }
-    const headers = ["Fecha Inicio", "Fecha Fin", "Péndulo", "Institución", "Estado"]
-    const rows = activas.map((r) => [
-      toDate(r.inicio_sesion_reserva).toLocaleString("es-ES"),
-      toDate(r.final_sesion_reserva).toLocaleString("es-ES"),
-      r.pendulo_id,
-      r.institucion,
-      r.estado,
-    ])
+    const headers = esDocenteOAdmin
+      ? ["Usuario", "Institución", "Fecha", "Hora", "Duración(min)", "Péndulo", "Estado"]
+      : ["Fecha Inicio", "Fecha Fin", "Péndulo", "Institución", "Estado"]
+    const rows = activas.map((r) => {
+      if (esDocenteOAdmin) {
+        const inicio = toDate(r.inicio_sesion_reserva)
+        const fin = toDate(r.final_sesion_reserva)
+        const duracion = Math.round((fin.getTime() - inicio.getTime()) / 60000)
+        return [
+          usuariosMap[r.usuario_id]?.nombre || r.usuario_id,
+          r.institucion,
+          inicio.toLocaleDateString("es-ES"),
+          inicio.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: false }),
+          String(duracion),
+          r.pendulo_id,
+          r.estado,
+        ]
+      }
+      return [
+        toDate(r.inicio_sesion_reserva).toLocaleString("es-ES"),
+        toDate(r.final_sesion_reserva).toLocaleString("es-ES"),
+        r.pendulo_id,
+        r.institucion,
+        r.estado,
+      ]
+    })
     const csv = [
       headers.join(","),
       ...rows.map((row) => row.map((c) => `"${c}"`).join(",")),
@@ -218,9 +267,13 @@ export default function ReservasPage() {
           {/* Header */}
           <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Reservar Sesión</h1>
+              <h1 className="text-3xl font-bold text-foreground">
+                {esDocenteOAdmin ? "Gestión de Reservas" : "Reservar Sesión"}
+              </h1>
               <p className="text-muted-foreground mt-2">
-                Selecciona una fecha y hora para tu sesión experimental con el péndulo físico
+                {esDocenteOAdmin
+                  ? "Visualiza todas las reservas del sistema y agenda nuevas sesiones"
+                  : "Selecciona una fecha y hora para tu sesión experimental con el péndulo físico"}
               </p>
             </div>
             <Button variant="outline" onClick={exportToCSV} className="self-start">
@@ -423,16 +476,20 @@ export default function ReservasPage() {
             </div>
           </div>
 
-          {/* Mis Reservas */}
+          {/* Reservas visibles por rol */}
           <Card className="mt-8">
             <CardHeader>
-              <CardTitle>Mis Reservas</CardTitle>
-              <CardDescription>Tus próximas sesiones programadas</CardDescription>
+              <CardTitle>{esDocenteOAdmin ? "Todas las Reservas" : "Mis Reservas"}</CardTitle>
+              <CardDescription>
+                {esDocenteOAdmin ? "Próximas sesiones de todos los usuarios" : "Tus próximas sesiones programadas"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {misReservasActivas.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
-                  No tienes reservas activas. ¡Selecciona una fecha y hora para comenzar!
+                  {esDocenteOAdmin
+                    ? "No hay reservas activas registradas en este momento"
+                    : "No tienes reservas activas. ¡Selecciona una fecha y hora para comenzar!"}
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -454,6 +511,11 @@ export default function ReservasPage() {
                               {" – "}
                               {fin.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: false })}
                             </p>
+                            {esDocenteOAdmin && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Usuario: {usuariosMap[r.usuario_id]?.nombre || r.usuario_id}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -464,18 +526,20 @@ export default function ReservasPage() {
                               <><Clock className="h-3 w-3 mr-1" /> Pendiente</>
                             )}
                           </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={cancellingId === r.id}
-                            onClick={() => handleCancelar(r.id)}
-                          >
-                            {cancellingId === r.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <><XCircle className="h-4 w-4 mr-1" /> Cancelar</>
-                            )}
-                          </Button>
+                          {(r.usuario_id === user?.uid || esDocenteOAdmin) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={cancellingId === r.id}
+                              onClick={() => handleCancelar(r.id)}
+                            >
+                              {cancellingId === r.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <><XCircle className="h-4 w-4 mr-1" /> Cancelar</>
+                              )}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     )

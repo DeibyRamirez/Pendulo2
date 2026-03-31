@@ -12,7 +12,7 @@ export default function DashboardDocentePage() {
   const { user, logout } = useAuth();
 
   return (
-    <ProtectedRoute requiredRole="docente">
+    <ProtectedRoute requiredRole="Docente" exactRole>
       <div className="min-h-screen bg-background">
         {/* Navbar */}
         <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">

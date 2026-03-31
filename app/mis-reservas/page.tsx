@@ -5,9 +5,12 @@ import MisReservaciones from '@/components/MisReservaciones';
 
 export default function MisReservasPage() {
   return (
-    <ProtectedRoute requiredRole="estudiante">
-      <main className="min-h-screen bg-gray-50">
-        <div className="py-12 px-4 sm:px-6 lg:px-8">
+    <ProtectedRoute requiredRole="Estudiante">
+      <main className="min-h-screen bg-background">
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.12),_transparent_45%)]" />
+        </div>
+        <div className="py-10 sm:py-12">
           <div className="max-w-7xl mx-auto">
             <MisReservaciones />
           </div>

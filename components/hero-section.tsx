@@ -110,11 +110,12 @@ export function HeroSection() {
                 </div>
               </div>
 
-              {/* QR Code badge */}
+              {/* En este apartado se agregaran unos qr de los pendulos mas usados y estos me llevara a ellos pendulo/1, pendulo/2, etc */}
+              {/* QR Code badge
               <div className="absolute top-4 right-4 flex items-center gap-2 rounded-lg border border-border bg-background/80 backdrop-blur-sm px-3 py-2">
                 <QrCode className="h-4 w-4 text-primary" />
                 <span className="text-xs text-muted-foreground">Escanea para acceder</span>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

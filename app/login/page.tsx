@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
 import { iniciarSesion } from '../services/authService';
 import { useAuth } from '@/hooks/useAuth';
+import { getDashboardPathByRole } from '@/lib/roles';
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,6 +15,7 @@ import { Eye, EyeOff, Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter();
+  const { user, rol } = useAuth();
 
   // Estado del formulario
   const [email, setEmail]           = useState('');
@@ -22,6 +25,14 @@ export default function LoginPage() {
   // Estados de UI
   const [isLoading, setIsLoading]   = useState(false);
   const [error, setError]           = useState('');
+  const [loginIntent, setLoginIntent] = useState(false);
+
+  useEffect(() => {
+    if (loginIntent && user) {
+      router.push(`/${getDashboardPathByRole(rol)}`);
+      setLoginIntent(false);
+    }
+  }, [loginIntent, user, rol, router]);
 
   interface ErrorMap {
     [key: string]: string;
@@ -56,14 +67,10 @@ export default function LoginPage() {
      setError('');
      setIsLoading(true);
 
-     try {
-       await iniciarSesion(email, password);
-       // Login exitoso: esperar un poco para que el hook useAuth se actualice
-       // y luego redirigir según el rol
-       setTimeout(() => {
-         router.push('/dashboard');
-       }, 500);
-     } catch (err) {
+      try {
+        await iniciarSesion(email, password);
+        setLoginIntent(true);
+      } catch (err) {
        // Mostrar error traducido al usuario
        const authError = err as AuthError;
        setError(traducirError(authError.code));

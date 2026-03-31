@@ -1,219 +1,247 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LogOut, Settings, Users, Zap, FileDown } from "lucide-react";
-import Link from "next/link";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { LogOut, Plus, RefreshCw, Settings2, UserCog } from "lucide-react";
+import {
+  actualizarEstadoPendulo,
+  crearPendulo,
+  escucharTodosPendulos,
+} from "@/app/services/penduloService";
+import {
+  actualizarEstadoUsuario,
+  actualizarRolUsuario,
+  escucharUsuarios,
+} from "@/app/services/usuarioService";
+
+type Rol = "Estudiante" | "Docente" | "Admin";
+type EstadoPendulo = "Activo" | "Inactivo" | "En_uso" | "En_mantenimiento";
+type EstadoUsuario = "active" | "disabled";
+
+interface Pendulo {
+  id: string;
+  pendulo_id: string;
+  institucion: string;
+  pais: string;
+  latitud: string;
+  longitud: string;
+  estado: EstadoPendulo;
+}
+
+interface Usuario {
+  uid: string;
+  nombre?: string;
+  email?: string;
+  rol?: Rol;
+  estado?: EstadoUsuario;
+}
+
+const ESTADOS_PENDULO: EstadoPendulo[] = ["Activo", "Inactivo", "En_uso", "En_mantenimiento"];
+const ROLES: Rol[] = ["Estudiante", "Docente", "Admin"];
 
 export default function DashboardAdminPage() {
   const { user, logout } = useAuth();
 
+  const [pendulos, setPendulos] = useState<Pendulo[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [savingPendulo, setSavingPendulo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [nuevoPendulo, setNuevoPendulo] = useState({
+    pendulo_id: "",
+    institucion: "",
+    pais: "",
+    latitud: "",
+    longitud: "",
+    estado: "Activo" as EstadoPendulo,
+  });
+
+  useEffect(() => {
+    const unsubPendulos = (escucharTodosPendulos as unknown as (cb: (data: Pendulo[]) => void) => () => void)((data) => {
+      setPendulos(data);
+    });
+
+    const unsubUsuarios = (escucharUsuarios as unknown as (cb: (data: Usuario[]) => void) => () => void)((data) => {
+      setUsuarios(data);
+    });
+
+    return () => {
+      unsubPendulos();
+      unsubUsuarios();
+    };
+  }, []);
+
+  const stats = useMemo(() => {
+    return {
+      totalPendulos: pendulos.length,
+      activos: pendulos.filter((p) => p.estado === "Activo").length,
+      totalUsuarios: usuarios.length,
+      admins: usuarios.filter((u) => u.rol === "Admin").length,
+    };
+  }, [pendulos, usuarios]);
+
+  const handleCrearPendulo = async () => {
+    setError(null);
+    if (!nuevoPendulo.pendulo_id || !nuevoPendulo.institucion || !nuevoPendulo.pais) {
+      setError("Completa los campos obligatorios del péndulo");
+      return;
+    }
+
+    try {
+      setSavingPendulo(true);
+      await crearPendulo(nuevoPendulo);
+      setNuevoPendulo({
+        pendulo_id: "",
+        institucion: "",
+        pais: "",
+        latitud: "",
+        longitud: "",
+        estado: "Activo",
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Error al crear péndulo");
+    } finally {
+      setSavingPendulo(false);
+    }
+  };
+
+  const handleEstadoPendulo = async (penduloId: string, estado: EstadoPendulo) => {
+    try {
+      await actualizarEstadoPendulo(penduloId, estado);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar el estado");
+    }
+  };
+
+  const handleRolUsuario = async (uid: string, rol: Rol) => {
+    try {
+      await actualizarRolUsuario(uid, rol);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar el rol");
+    }
+  };
+
+  const handleEstadoUsuario = async (uid: string, estado: EstadoUsuario) => {
+    try {
+      await actualizarEstadoUsuario(uid, estado);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar el estado");
+    }
+  };
+
   return (
-    <ProtectedRoute requiredRole="admin">
+    <ProtectedRoute requiredRole="Admin" exactRole>
       <div className="min-h-screen bg-background">
-        {/* Navbar */}
         <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="4" r="2" />
-                  <line x1="12" y1="6" x2="12" y2="16" />
-                  <circle cx="12" cy="18" r="3" fill="currentColor" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">WPA</h1>
-                <p className="text-xs text-muted-foreground">Administrador</p>
-              </div>
+            <div>
+              <h1 className="text-lg font-bold text-foreground">Panel Admin WPA</h1>
+              <p className="text-xs text-muted-foreground">Gestión completa de usuarios y péndulos</p>
             </div>
-            
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <p className="text-sm font-medium text-foreground">{user?.nombre || user?.email}</p>
                 <p className="text-xs text-muted-foreground">Administrador</p>
               </div>
-              <Button variant="outline" size="sm" onClick={logout}>
+              <Button variant="destructive" size="sm" onClick={logout}>
                 <LogOut className="w-4 h-4 mr-2" />
-                Salir
+                Cerrar sesión
               </Button>
             </div>
           </div>
         </nav>
 
-        {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-6 py-8">
-          {/* Welcome Section */}
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-foreground mb-2">Panel de Administración</h2>
-            <p className="text-muted-foreground">Gestiona usuarios, péndulos y configuraciones del sistema</p>
+        <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+          {error && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Péndulos</p><p className="text-2xl font-bold">{stats.totalPendulos}</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Activos</p><p className="text-2xl font-bold text-emerald-600">{stats.activos}</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Usuarios</p><p className="text-2xl font-bold">{stats.totalUsuarios}</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Admins</p><p className="text-2xl font-bold text-primary">{stats.admins}</p></CardContent></Card>
           </div>
 
-          {/* Grid de módulos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {/* Card: Gestionar Usuarios */}
-            <Card className="border-border/50 hover:border-primary/50 transition-colors">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-primary" />
-                  Gestionar Usuarios
-                </CardTitle>
-                <CardDescription>
-                  Administra cuentas y roles
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Ver, editar roles, desactivar cuentas y revisar permisos de usuarios en el sistema.
-                </p>
-                <Button className="w-full">Ir a Usuarios</Button>
-              </CardContent>
-            </Card>
-
-            {/* Card: Gestionar Péndulos */}
-            <Card className="border-border/50 hover:border-primary/50 transition-colors">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-primary" />
-                  Gestionar Péndulos
-                </CardTitle>
-                <CardDescription>
-                  Registrar y configurar péndulos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Registra nuevos péndulos de la red WPA con coordenadas, institución y estado inicial.
-                </p>
-                <Button className="w-full">Ir a Péndulos</Button>
-              </CardContent>
-            </Card>
-
-            {/* Card: Reportes */}
-            <Card className="border-border/50 hover:border-primary/50 transition-colors">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileDown className="w-5 h-5 text-primary" />
-                  Reportes
-                </CardTitle>
-                <CardDescription>
-                  Descargar reportes del sistema
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Exporta reportes completos de reservas, usuarios activos y estadísticas del sistema.
-                </p>
-                <Button className="w-full" variant="outline">Descargar Reportes</Button>
-              </CardContent>
-            </Card>
-
-            {/* Card: Configuración del Sistema */}
-            <Card className="border-border/50 hover:border-primary/50 transition-colors">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-primary" />
-                  Configuración
-                </CardTitle>
-                <CardDescription>
-                  Ajustes generales del sistema
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Configura parámetros del sistema, límites de tiempo de sesión y otras opciones.
-                </p>
-                <Button className="w-full" variant="outline">Configurar</Button>
-              </CardContent>
-            </Card>
-
-            {/* Card: Ver Historial Completo */}
-            <Card className="border-border/50 hover:border-primary/50 transition-colors">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileDown className="w-5 h-5 text-primary" />
-                  Historial
-                </CardTitle>
-                <CardDescription>
-                  Todos los datos del sistema
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Accede al historial completo de todas las sesiones, usuarios y experimentos del sistema.
-                </p>
-                <Link href="/historial">
-                  <Button className="w-full" variant="outline">Ver Historial</Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            {/* Card: Mapa de Péndulos */}
-            <Card className="border-border/50 hover:border-primary/50 transition-colors">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-primary" />
-                  Mapa WPA
-                </CardTitle>
-                <CardDescription>
-                  Red global de péndulos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Visualiza todos los péndulos de la red WPA en el mapa interactivo mundial.
-                </p>
-                <Link href="/mapa">
-                  <Button className="w-full">Ver Mapa</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Estadísticas Generales */}
-          <Card className="border-border/50 bg-card/30 mb-8">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Estadísticas del Sistema</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Plus className="w-5 h-5" /> Agregar péndulo</CardTitle>
+              <CardDescription>Crea un nuevo documento en la colección pendulos</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-5 gap-4">
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-primary mb-1">156</p>
-                  <p className="text-sm text-muted-foreground">Usuarios</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-primary mb-1">328</p>
-                  <p className="text-sm text-muted-foreground">Sesiones</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-primary mb-1">12</p>
-                  <p className="text-sm text-muted-foreground">Péndulos Activos</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-primary mb-1">98%</p>
-                  <p className="text-sm text-muted-foreground">Uptime</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-primary mb-1">8 Paises</p>
-                  <p className="text-sm text-muted-foreground">Red Global</p>
-                </div>
+            <CardContent className="grid md:grid-cols-3 gap-4">
+              <div><Label>ID péndulo</Label><Input value={nuevoPendulo.pendulo_id} onChange={(e) => setNuevoPendulo({ ...nuevoPendulo, pendulo_id: e.target.value })} placeholder="uac-001" /></div>
+              <div><Label>Institución</Label><Input value={nuevoPendulo.institucion} onChange={(e) => setNuevoPendulo({ ...nuevoPendulo, institucion: e.target.value })} /></div>
+              <div><Label>País</Label><Input value={nuevoPendulo.pais} onChange={(e) => setNuevoPendulo({ ...nuevoPendulo, pais: e.target.value })} /></div>
+              <div><Label>Latitud</Label><Input value={nuevoPendulo.latitud} onChange={(e) => setNuevoPendulo({ ...nuevoPendulo, latitud: e.target.value })} /></div>
+              <div><Label>Longitud</Label><Input value={nuevoPendulo.longitud} onChange={(e) => setNuevoPendulo({ ...nuevoPendulo, longitud: e.target.value })} /></div>
+              <div>
+                <Label>Estado inicial</Label>
+                <select className="mt-2 w-full h-9 rounded-md border border-input bg-background px-3 text-sm" value={nuevoPendulo.estado} onChange={(e) => setNuevoPendulo({ ...nuevoPendulo, estado: e.target.value as EstadoPendulo })}>
+                  {ESTADOS_PENDULO.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
+                </select>
+              </div>
+              <div className="md:col-span-3">
+                <Button onClick={handleCrearPendulo} disabled={savingPendulo}>
+                  {savingPendulo ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : <><Plus className="mr-2 h-4 w-4" /> Crear péndulo</>}
+                </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Alertas y Notificaciones */}
-          <Card className="border-border/50 border-yellow-500/50 bg-yellow-500/5">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-lg text-yellow-600">⚠️ Alertas del Sistema</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Settings2 className="w-5 h-5" /> Péndulos registrados</CardTitle>
+              <CardDescription>Actualiza el estado y se reflejará en el mapa en tiempo real</CardDescription>
             </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>• 2 usuarios pendientes de verificación de email</li>
-                <li>• 1 péndulo sin conexión (Nodo: UNIANDES)</li>
-                <li>• Base de datos: 75% de capacidad utilizada</li>
-              </ul>
+            <CardContent className="space-y-3">
+              {pendulos.map((p) => (
+                <div key={p.id} className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-lg border border-border p-3">
+                  <div>
+                    <p className="font-medium">{p.institucion} <span className="text-muted-foreground">({p.pais})</span></p>
+                    <p className="text-xs text-muted-foreground">{p.pendulo_id}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{p.estado}</Badge>
+                    <select className="h-9 rounded-md border border-input bg-background px-3 text-sm" value={p.estado} onChange={(e) => handleEstadoPendulo(p.id, e.target.value as EstadoPendulo)}>
+                      {ESTADOS_PENDULO.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
+                    </select>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><UserCog className="w-5 h-5" /> Gestión de usuarios</CardTitle>
+              <CardDescription>Cambia rol y estado de las cuentas registradas</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {usuarios.map((u) => (
+                <div key={u.uid} className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-lg border border-border p-3">
+                  <div>
+                    <p className="font-medium">{u.nombre || "Sin nombre"}</p>
+                    <p className="text-xs text-muted-foreground">{u.email || u.uid}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select className="h-9 rounded-md border border-input bg-background px-3 text-sm" value={u.rol || "Estudiante"} onChange={(e) => handleRolUsuario(u.uid, e.target.value as Rol)}>
+                      {ROLES.map((rolOpt) => <option key={rolOpt} value={rolOpt}>{rolOpt}</option>)}
+                    </select>
+                    <select className="h-9 rounded-md border border-input bg-background px-3 text-sm" value={u.estado || "active"} onChange={(e) => handleEstadoUsuario(u.uid, e.target.value as EstadoUsuario)}>
+                      <option value="active">Activo</option>
+                      <option value="disabled">Desactivado</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </main>

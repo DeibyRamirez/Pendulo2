@@ -12,7 +12,7 @@ export default function DashboardPage() {
   const { user, logout } = useAuth();
 
   return (
-    <ProtectedRoute requiredRole="estudiante">
+    <ProtectedRoute requiredRole="Estudiante" exactRole>
       <div className="min-h-screen bg-background">
         {/* Navbar */}
         <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
@@ -69,7 +69,7 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Observa el movimiento del péndulo, ángulo, velocidad y oscilaciones en tiempo real con gráficas interactivas.
                 </p>
-                <Link href="/pendulo">
+                <Link href="/pendulo/1">
                   <Button className="w-full">Ver Dashboard</Button>
                 </Link>
               </CardContent>
@@ -139,7 +139,7 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* Live Preview Section */}
+          {/* Live Preview Section
           <Card className="mb-8 border-border/50">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -170,7 +170,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* Información del Sistema */}
           <Card className="border-border/50 bg-card/30">

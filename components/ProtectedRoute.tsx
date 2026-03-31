@@ -3,27 +3,33 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { getDashboardPathByRole, hasRequiredRole, type UserRole } from "@/lib/roles";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: "estudiante" | "docente" | "admin";
+  requiredRole?: UserRole;
+  exactRole?: boolean;
 }
 
-export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requiredRole, exactRole = false }: ProtectedRouteProps) {
   const { user, loading, rol } = useAuth();
   const router = useRouter();
+
+  const hasAccess = exactRole
+    ? (!requiredRole || rol === requiredRole)
+    : hasRequiredRole(rol, requiredRole);
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
         // No autenticado, redirigir al login
         router.push("/login");
-      } else if (requiredRole && rol !== requiredRole) {
+      } else if (!hasAccess) {
         // Rol insuficiente, redirigir al dashboard del usuario
-        router.push(`/${getDashboardPath(rol)}`);
+        router.push(`/${getDashboardPathByRole(rol)}`);
       }
     }
-  }, [user, loading, rol, requiredRole, router]);
+  }, [user, loading, hasAccess, rol, router]);
 
   if (loading) {
     return (
@@ -40,21 +46,9 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     return null;
   }
 
-  if (requiredRole && rol !== requiredRole) {
+  if (!hasAccess) {
     return null;
   }
 
   return <>{children}</>;
-}
-
-function getDashboardPath(rol: string | null): string {
-  switch (rol) {
-    case "admin":
-      return "admin";
-    case "docente":
-      return "docente";
-    case "estudiante":
-    default:
-      return "dashboard";
-  }
 }

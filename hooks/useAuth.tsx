@@ -4,17 +4,19 @@ import { useState, useEffect, useContext, createContext, ReactNode } from "react
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/app/services/firebase";
+import { normalizeRole, type UserRole } from "@/lib/roles";
 
 export interface AuthUser extends User {
-  rol?: "estudiante" | "docente" | "admin";
+  rol?: UserRole;
   institucion?: string;
   nombre?: string;
+  estado?: "active" | "disabled";
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  rol: string | null;
+  rol: UserRole | null;
   logout: () => Promise<void>;
 }
 
@@ -22,7 +24,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [rol, setRol] = useState<string | null>(null);
+  const [rol, setRol] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,16 +35,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             const authUserWithRole = authUser as AuthUser;
-            authUserWithRole.rol = userData.rol || "estudiante";
+            const normalizedRole = normalizeRole(userData.rol);
+            authUserWithRole.rol = normalizedRole;
             authUserWithRole.institucion = userData.institucion;
             authUserWithRole.nombre = userData.nombre;
+            authUserWithRole.estado = userData.estado || "active";
 
             setUser(authUserWithRole);
-            setRol(userData.rol || "estudiante");
+            setRol(normalizedRole);
+          } else {
+            const authUserWithDefaultRole = authUser as AuthUser;
+            authUserWithDefaultRole.rol = "Estudiante";
+            setUser(authUserWithDefaultRole);
+            setRol("Estudiante");
           }
         } catch (error) {
           console.error("Error obteniendo datos del usuario:", error);
-          setUser(authUser as AuthUser);
+          const fallbackUser = authUser as AuthUser;
+          fallbackUser.rol = "Estudiante";
+          setUser(fallbackUser);
+          setRol("Estudiante");
         }
       } else {
         setUser(null);

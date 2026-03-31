@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react"
-import { registrarUsuario } from "@/app/services/authService"
+import { ALLOWED_EMAIL_DOMAINS, registrarUsuario, validarDominioInstitucional } from "@/app/services/authService"
 
 const INSTITUCIONES = [
   { value: "Corporación Universitaria Autónoma del Cauca", label: "Corporación Universitaria Autónoma del Cauca" },
@@ -30,7 +30,6 @@ export default function RegistroPage() {
     nombre: "",
     email: "",
     institucion: "",
-    rol: "",
     password: "",
     confirmPassword: ""
   })
@@ -41,8 +40,10 @@ export default function RegistroPage() {
     if (!formData.nombre) newErrors.nombre = "El nombre es requerido"
     if (!formData.email) newErrors.email = "El correo es requerido"
     else if (!formData.email.includes("@")) newErrors.email = "Correo inválido"
+    else if (!validarDominioInstitucional(formData.email)) {
+      newErrors.email = `Dominio no autorizado. Dominios permitidos: ${ALLOWED_EMAIL_DOMAINS.join(", ")}`
+    }
     if (!formData.institucion) newErrors.institucion = "Selecciona una institución"
-    if (!formData.rol) newErrors.rol = "Selecciona un rol"
     
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -74,8 +75,8 @@ export default function RegistroPage() {
 
      try {
        // Registro real con Firebase Auth
-       await registrarUsuario(formData.email, formData.password, formData.nombre, formData.rol, formData.institucion),
-       setStep(3)
+       await registrarUsuario(formData.email, formData.password, formData.nombre, formData.institucion),
+        setStep(3)
      } catch (error: any) {
        // Manejar errores de Firebase
        console.error('Error en el registro:', error)
@@ -211,21 +212,8 @@ export default function RegistroPage() {
                     {errors.institucion && <p className="text-xs text-destructive">{errors.institucion}</p>}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="rol">Rol</Label>
-                    <Select
-                      value={formData.rol}
-                      onValueChange={(value) => setFormData({ ...formData, rol: value })}
-                    >
-                      <SelectTrigger className={`bg-input/50 ${errors.rol ? "border-destructive" : ""}`}>
-                        <SelectValue placeholder="Selecciona tu rol" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="estudiante">Estudiante</SelectItem>
-                        <SelectItem value="docente">Docente</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {errors.rol && <p className="text-xs text-destructive">{errors.rol}</p>}
+                  <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+                    Tu cuenta se crea con rol <strong className="text-foreground">Estudiante</strong>. Solo un Admin puede cambiar roles.
                   </div>
 
                   <Button type="submit" className="w-full">

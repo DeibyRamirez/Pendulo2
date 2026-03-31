@@ -6,7 +6,17 @@ import { useReservations } from '@/hooks/useReservations';
 import type { EstadoReservacion, Reservacion } from '@/hooks/useReservations';
 import type { Timestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  Loader2,
+  Timer,
+  XCircle,
+  AlertTriangle,
+} from 'lucide-react';
 
 function esTimestamp(value: unknown): value is Timestamp {
   return !!value && typeof value === 'object' && 'toDate' in (value as Record<string, unknown>);
@@ -75,18 +85,24 @@ export default function MisReservaciones() {
     }
   };
 
+  const obtenerDuracionMin = (inicioTs: Timestamp | Date, finTs: Timestamp | Date) => {
+    const inicio = esTimestamp(inicioTs) ? inicioTs.toDate() : inicioTs;
+    const fin = esTimestamp(finTs) ? finTs.toDate() : finTs;
+    return Math.max(0, Math.round((fin.getTime() - inicio.getTime()) / 60000));
+  };
+
   const getEstadoColor = (estado: EstadoReservacion) => {
     switch (estado) {
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-amber-500/15 text-amber-700 border-amber-500/30';
       case 'active':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-sky-500/15 text-sky-700 border-sky-500/30';
       case 'completed':
-        return 'bg-green-100 text-green-800';
+        return 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30';
       case 'cancelled':
-        return 'bg-red-100 text-red-800';
+        return 'bg-rose-500/15 text-rose-700 border-rose-500/30';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -101,140 +117,192 @@ export default function MisReservaciones() {
   };
 
   if (loading) {
-    return <div className="text-center py-8">Cargando tus reservaciones...</div>;
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Cargando tus reservaciones...
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Mis Reservaciones</h1>
+    <div className="w-full max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Mis Reservas</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Consulta tus sesiones programadas, activas e históricas del péndulo remoto.
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+          Usuario: <span className="font-medium text-foreground">{user?.nombre || user?.email || 'Sin sesión'}</span>
+        </div>
+      </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertTriangle className="h-4 w-4" />
           Error: {error}
         </div>
       )}
 
       {cancelError && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+        <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {cancelError}
         </div>
       )}
 
-      {/* Estadísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold">{estadisticas.total}</div>
-          <div className="text-sm text-gray-600">Total</div>
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="mt-1 text-2xl font-semibold">{estadisticas.total}</p>
+          </CardContent>
         </Card>
-        <Card className="p-4 text-center bg-yellow-50">
-          <div className="text-2xl font-bold text-yellow-700">{estadisticas.pending}</div>
-          <div className="text-sm text-gray-600">Pendientes</div>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Pendientes</p>
+            <p className="mt-1 text-2xl font-semibold text-amber-600">{estadisticas.pending}</p>
+          </CardContent>
         </Card>
-        <Card className="p-4 text-center bg-blue-50">
-          <div className="text-2xl font-bold text-blue-700">{estadisticas.active}</div>
-          <div className="text-sm text-gray-600">En Progreso</div>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">En progreso</p>
+            <p className="mt-1 text-2xl font-semibold text-sky-600">{estadisticas.active}</p>
+          </CardContent>
         </Card>
-        <Card className="p-4 text-center bg-green-50">
-          <div className="text-2xl font-bold text-green-700">{estadisticas.completed}</div>
-          <div className="text-sm text-gray-600">Completadas</div>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Completadas</p>
+            <p className="mt-1 text-2xl font-semibold text-emerald-600">{estadisticas.completed}</p>
+          </CardContent>
         </Card>
-        <Card className="p-4 text-center bg-red-50">
-          <div className="text-2xl font-bold text-red-700">{estadisticas.cancelled}</div>
-          <div className="text-sm text-gray-600">Canceladas</div>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Canceladas</p>
+            <p className="mt-1 text-2xl font-semibold text-rose-600">{estadisticas.cancelled}</p>
+          </CardContent>
         </Card>
       </div>
 
-      {/* Filtros */}
-      <div className="mb-6 flex gap-2 flex-wrap">
+      <div className="mb-6 flex flex-wrap gap-2">
         <Button
           onClick={() => setFiltroEstado('all')}
           variant={filtroEstado === 'all' ? 'default' : 'outline'}
+          size="sm"
         >
           Todas ({estadisticas.total})
         </Button>
         <Button
           onClick={() => setFiltroEstado('pending')}
           variant={filtroEstado === 'pending' ? 'default' : 'outline'}
-          className={filtroEstado === 'pending' ? 'bg-yellow-600' : ''}
+          size="sm"
         >
           Pendientes ({estadisticas.pending})
         </Button>
         <Button
           onClick={() => setFiltroEstado('active')}
           variant={filtroEstado === 'active' ? 'default' : 'outline'}
-          className={filtroEstado === 'active' ? 'bg-blue-600' : ''}
+          size="sm"
         >
           En Progreso ({estadisticas.active})
         </Button>
         <Button
           onClick={() => setFiltroEstado('completed')}
           variant={filtroEstado === 'completed' ? 'default' : 'outline'}
-          className={filtroEstado === 'completed' ? 'bg-green-600' : ''}
+          size="sm"
         >
           Completadas ({estadisticas.completed})
         </Button>
         <Button
           onClick={() => setFiltroEstado('cancelled')}
           variant={filtroEstado === 'cancelled' ? 'default' : 'outline'}
-          className={filtroEstado === 'cancelled' ? 'bg-red-600' : ''}
+          size="sm"
         >
           Canceladas ({estadisticas.cancelled})
         </Button>
       </div>
 
-      {/* Tabla de Reservaciones */}
       {reservacionesFiltradas.length === 0 ? (
-        <Card className="p-6 text-center text-gray-500">
-          No hay reservaciones para mostrar
+        <Card>
+          <CardContent className="p-8 text-center">
+            <CalendarClock className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No hay reservaciones para el filtro actual.</p>
+          </CardContent>
         </Card>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-100 border-b">
-                <th className="px-4 py-3 text-left text-sm font-semibold">Péndulo</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Institución</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Inicio</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Fin</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Estado</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reservacionesFiltradas.map((reservacion: Reservacion) => (
-                <tr key={reservacion.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm">{reservacion.pendulo_id}</td>
-                  <td className="px-4 py-3 text-sm">{reservacion.institucion}</td>
-                  <td className="px-4 py-3 text-sm">
-                    {formatearFecha(reservacion.inicio_sesion_reserva)}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {formatearFecha(reservacion.final_sesion_reserva)}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getEstadoColor(reservacion.estado)}`}>
+        <div className="grid gap-4">
+          {reservacionesFiltradas.map((reservacion: Reservacion) => {
+            const duracion = obtenerDuracionMin(
+              reservacion.inicio_sesion_reserva,
+              reservacion.final_sesion_reserva
+            );
+
+            return (
+              <Card key={reservacion.id} className="border-border/80">
+                <CardHeader className="pb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base">Péndulo {reservacion.pendulo_id}</CardTitle>
+                      <CardDescription>{reservacion.institucion}</CardDescription>
+                    </div>
+                    <Badge className={`border ${getEstadoColor(reservacion.estado)}`}>
                       {getEstadoLabel(reservacion.estado)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {reservacion.estado === 'pending' && (
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-md border border-border bg-muted/30 p-3">
+                      <p className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock3 className="h-3 w-3" /> Inicio
+                      </p>
+                      <p className="text-sm font-medium">{formatearFecha(reservacion.inicio_sesion_reserva)}</p>
+                    </div>
+                    <div className="rounded-md border border-border bg-muted/30 p-3">
+                      <p className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <CheckCircle2 className="h-3 w-3" /> Fin
+                      </p>
+                      <p className="text-sm font-medium">{formatearFecha(reservacion.final_sesion_reserva)}</p>
+                    </div>
+                    <div className="rounded-md border border-border bg-muted/30 p-3">
+                      <p className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Timer className="h-3 w-3" /> Duración
+                      </p>
+                      <p className="text-sm font-medium">{duracion} minutos</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-end">
+                    {reservacion.estado === 'pending' ? (
                       <Button
                         onClick={() => handleCancelar(reservacion.id, reservacion.estado)}
                         disabled={cancelando === reservacion.id}
                         variant="destructive"
                         size="sm"
                       >
-                        {cancelando === reservacion.id ? 'Cancelando...' : 'Cancelar'}
+                        {cancelando === reservacion.id ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Cancelando...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Cancelar reserva
+                          </>
+                        )}
                       </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Sin acciones disponibles</span>
                     )}
-                    {reservacion.estado !== 'pending' && (
-                      <span className="text-gray-400 text-sm">N/A</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

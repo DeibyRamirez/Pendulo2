@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ChangeEvent, type MouseEvent } from 'react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useAuth } from '@/hooks/useAuth';
 import { useReservations } from '@/hooks/useReservations';
@@ -103,7 +103,7 @@ export default function HistorialPage() {
   };
 
   return (
-    <ProtectedRoute requiredRole="estudiante">
+    <ProtectedRoute requiredRole="Estudiante">
       <main className="min-h-screen bg-background">
         <div className="pt-24 pb-16">
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -180,7 +180,7 @@ export default function HistorialPage() {
                     <Input
                       placeholder="Buscar por péndulo o institución..."
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                       className="pl-10"
                     />
                   </div>
@@ -261,7 +261,7 @@ export default function HistorialPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={(e) => {
+                                onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                   e.stopPropagation();
                                   // lógica de descarga individual si aplica
                                 }}

@@ -3,6 +3,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { getDashboardPathByRole } from "@/lib/roles";
 
 export function RoleRedirect() {
   const { user, loading, rol } = useAuth();
@@ -11,7 +12,7 @@ export function RoleRedirect() {
   useEffect(() => {
     if (!loading && user && rol) {
       // Redirigir según el rol
-      const dashboardPath = getDashboardPath(rol);
+      const dashboardPath = getDashboardPathByRole(rol);
       if (!window.location.pathname.includes(dashboardPath)) {
         router.push(`/${dashboardPath}`);
       }
@@ -19,16 +20,4 @@ export function RoleRedirect() {
   }, [user, loading, rol, router]);
 
   return null;
-}
-
-function getDashboardPath(rol: string | null): string {
-  switch (rol) {
-    case "admin":
-      return "admin";
-    case "docente":
-      return "docente";
-    case "estudiante":
-    default:
-      return "dashboard";
-  }
 }

@@ -256,3 +256,27 @@ export function escucharReservacionesUsuario(usuario_id, callback) {
     console.error('Error al escuchar reservaciones:', error);
   });
 }
+
+/**
+ * Escuchar cambios en tiempo real de todas las reservaciones
+ * @param {Function} callback - Funcion a ejecutar cuando hay cambios
+ * @returns {Function} Funcion para desuscribirse
+ */
+export function escucharTodasReservaciones(callback) {
+  return onSnapshot(
+    collection(db, 'reservaciones'),
+    (querySnapshot) => {
+      const reservaciones = [];
+      querySnapshot.forEach((doc) => {
+        reservaciones.push({
+          id: doc.id,
+          ...doc.data(),
+        });
+      });
+      callback(reservaciones);
+    },
+    (error) => {
+      console.error('Error al escuchar todas las reservaciones:', error);
+    }
+  );
+}
