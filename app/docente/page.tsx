@@ -4,9 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LogOut, Calendar, BarChart3, Users, FileDown } from "lucide-react";
+import { LogOut, Calendar, BarChart3, Users, FileDown, Globe, MapPin } from "lucide-react";
 import Link from "next/link";
-import { PendulumChart } from "@/components/pendulum-chart";
 
 export default function DashboardDocentePage() {
   const { user, logout } = useAuth();
@@ -132,6 +131,33 @@ export default function DashboardDocentePage() {
                 </p>
                 <Link href="/historial">
                   <Button className="w-full" variant="outline">Ver Historial</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* Card: Mapa de Péndulos */}
+            <Card className="border-border/50 hover:border-primary/50 transition-colors md:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-primary" />
+                  Mapa de Péndulos WPA
+                </CardTitle>
+                <CardDescription>
+                  Visualiza los nodos de la red y abre cada péndulo
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 rounded-lg border border-border bg-muted/40 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Red global de laboratorios</p>
+                      <p className="text-xs text-muted-foreground">Consulta estado, ubicación y acceso a cada péndulo</p>
+                    </div>
+                    <MapPin className="h-5 w-5 text-primary" />
+                  </div>
+                </div>
+                <Link href="/mapa">
+                  <Button className="w-full">Ver mapa de péndulos</Button>
                 </Link>
               </CardContent>
             </Card>
