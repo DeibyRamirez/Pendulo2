@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react"
-import { ALLOWED_EMAIL_DOMAINS, registrarUsuario, validarDominioInstitucional } from "@/app/services/authService"
+import { completarRegistroGoogle, registrarUsuario, validarDominioInstitucional } from "@/app/services/authService"
 
 const INSTITUCIONES = [
   { value: "Corporación Universitaria Autónoma del Cauca", label: "Corporación Universitaria Autónoma del Cauca" },
@@ -22,6 +22,7 @@ const INSTITUCIONES = [
 
 export default function RegistroPage() {
   const router = useRouter()
+  const [googleSession, setGoogleSession] = useState({ uid: "", email: "", nombre: "", fotoURL: "" })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -35,15 +36,33 @@ export default function RegistroPage() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const uid = params.get("uid") || ""
+    const email = params.get("email") || ""
+    const nombre = params.get("nombre") || ""
+    const fotoURL = params.get("fotoURL") || ""
+
+    if (uid || email) {
+      setGoogleSession({ uid, email, nombre, fotoURL })
+      setFormData((prev) => ({
+        ...prev,
+        nombre: nombre || prev.nombre,
+        email: email || prev.email,
+      }))
+    }
+  }, [])
+
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {}
     if (!formData.nombre) newErrors.nombre = "El nombre es requerido"
     if (!formData.email) newErrors.email = "El correo es requerido"
     else if (!formData.email.includes("@")) newErrors.email = "Correo inválido"
     else if (!validarDominioInstitucional(formData.email)) {
-      newErrors.email = `Dominio no autorizado. Dominios permitidos: ${ALLOWED_EMAIL_DOMAINS.join(", ")}`
+      newErrors.email = "El correo debe terminar en .edu.co"
     }
     if (!formData.institucion) newErrors.institucion = "Selecciona una institución"
+    if (googleSession.uid && !formData.email) newErrors.email = "No se pudo leer tu correo de Google"
     
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -62,22 +81,41 @@ export default function RegistroPage() {
   }
 
   const handleNext = () => {
+    if (googleSession.uid) {
+      void handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+      return
+    }
+
     if (validateStep1()) {
       setStep(2)
     }
   }
 
-   const handleSubmit = async (e: React.FormEvent) => {
-     e.preventDefault()
-     if (!validateStep2()) return
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault()
+      if (googleSession.uid) {
+        if (!validateStep1()) return
+      } else if (!validateStep2()) {
+        return
+      }
 
-     setIsLoading(true)
+      setIsLoading(true)
 
-     try {
-       // Registro real con Firebase Auth
-       await registrarUsuario(formData.email, formData.password, formData.nombre, formData.institucion),
-        setStep(3)
-     } catch (error: any) {
+      try {
+        if (googleSession.uid) {
+          await completarRegistroGoogle({
+            uid: googleSession.uid,
+            email: formData.email,
+            nombre: formData.nombre,
+            institucion: formData.institucion,
+            fotoURL: googleSession.fotoURL,
+          })
+        } else {
+          // Registro real con Firebase Auth
+          await registrarUsuario(formData.email, formData.password, formData.nombre, formData.institucion)
+        }
+         setStep(3)
+      } catch (error: any) {
        // Manejar errores de Firebase
        console.error('Error en el registro:', error)
        // Puedes mostrar el error al usuario aquí si lo deseas
@@ -116,8 +154,8 @@ export default function RegistroPage() {
             <p className="text-muted-foreground mb-6">
               Tu cuenta ha sido creada. Hemos enviado un correo de verificación a <strong>{formData.email}</strong>
             </p>
-            <Button onClick={() => router.push("/login")} className="w-full">
-              Ir a Iniciar Sesión
+            <Button onClick={() => router.push(googleSession.uid ? "/dashboard" : "/login")} className="w-full">
+              {googleSession.uid ? "Ir al Dashboard" : "Ir a Iniciar Sesión"}
             </Button>
           </CardContent>
         </Card>
@@ -154,9 +192,9 @@ export default function RegistroPage() {
         <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Crear Cuenta</CardTitle>
-            <CardDescription>
-              {step === 1 ? "Ingresa tus datos personales" : "Crea una contraseña segura"}
-            </CardDescription>
+             <CardDescription>
+               {googleSession.uid ? "Completa los datos de tu institución" : step === 1 ? "Ingresa tus datos personales" : "Crea una contraseña segura"}
+             </CardDescription>
             {/* Progress indicator */}
             <div className="flex gap-2 justify-center mt-4">
               <div className={`h-1 w-16 rounded-full ${step >= 1 ? "bg-primary" : "bg-muted"}`} />
@@ -164,7 +202,7 @@ export default function RegistroPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={step === 2 ? handleSubmit : (e) => { e.preventDefault(); handleNext() }} className="space-y-4">
+            <form onSubmit={googleSession.uid ? handleSubmit : step === 2 ? handleSubmit : (e) => { e.preventDefault(); handleNext() }} className="space-y-4">
               {step === 1 && (
                 <>
                   <div className="space-y-2">
@@ -175,19 +213,21 @@ export default function RegistroPage() {
                       value={formData.nombre}
                       onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                       className={`bg-input/50 ${errors.nombre ? "border-destructive" : ""}`}
+                      disabled={Boolean(googleSession.nombre)}
                     />
                     {errors.nombre && <p className="text-xs text-destructive">{errors.nombre}</p>}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email">Correo Institucional</Label>
+                    <Label htmlFor="email">Correo Educativo</Label>
                     <Input
                       id="email"
                       type="email"
-                      placeholder="usuario@uniautonoma.edu.co"
+                      placeholder="usuario@universidad.edu.co"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className={`bg-input/50 ${errors.email ? "border-destructive" : ""}`}
+                      disabled={Boolean(googleSession.email)}
                     />
                     {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                   </div>
@@ -212,17 +252,29 @@ export default function RegistroPage() {
                     {errors.institucion && <p className="text-xs text-destructive">{errors.institucion}</p>}
                   </div>
 
-                  <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-                    Tu cuenta se crea con rol <strong className="text-foreground">Estudiante</strong>. Solo un Admin puede cambiar roles.
-                  </div>
-
-                  <Button type="submit" className="w-full">
-                    Continuar
-                  </Button>
+                  {googleSession.uid ? (
+                    <>
+                      <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+                        Estás ingresando con Google. Solo completa tu institución para finalizar.
+                      </div>
+                      <Button type="submit" className="w-full">
+                        Continuar
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+                        Tu cuenta se crea con rol <strong className="text-foreground">Estudiante</strong>. Solo un Admin puede cambiar roles.
+                      </div>
+                      <Button type="submit" className="w-full">
+                        Continuar
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
 
-              {step === 2 && (
+              {step === 2 && !googleSession.uid && (
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="password">Contraseña</Label>

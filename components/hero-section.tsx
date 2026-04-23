@@ -7,7 +7,7 @@ import { useMemo, useState } from "react"
 import { usePendulos } from "@/hooks/usePendulos"
 import { QRCodeSVG } from "qrcode.react"
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pendulo2.vercel.app/"
 
 export function HeroSection() {
   const { pendulos } = usePendulos()

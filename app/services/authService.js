@@ -15,6 +15,8 @@
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
   signOut,
   updateProfile,
 } from 'firebase/auth';
@@ -22,17 +24,19 @@ import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { normalizeRole } from '@/lib/roles';
 
-export const ALLOWED_EMAIL_DOMAINS = (
-  process.env.NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS ||
-  'uniautonoma.edu.co,uniandes.edu.co,unal.edu.co,upc.edu,mit.edu,wpa.org'
-)
-  .split(',')
-  .map((domain) => domain.trim().toLowerCase())
-  .filter(Boolean);
-
 export function validarDominioInstitucional(email) {
-  const domain = (email.split('@')[1] || '').toLowerCase();
-  return ALLOWED_EMAIL_DOMAINS.includes(domain);
+  return (email || '').toLowerCase().endsWith('.edu.co');
+}
+
+async function validarSesionInstitucional(user) {
+  if (!user?.email || !validarDominioInstitucional(user.email)) {
+    await signOut(auth);
+    const error = new Error('El correo de Google debe terminar en .edu.co');
+    error.code = 'auth/unauthorized-domain';
+    throw error;
+  }
+
+  return user;
 }
 
 /**
@@ -43,6 +47,16 @@ export function validarDominioInstitucional(email) {
  */
 export async function iniciarSesion(email, password) {
   const credencial = await signInWithEmailAndPassword(auth, email, password);
+  return credencial;
+}
+
+/**
+ * Inicia sesión con Google y valida que el correo sea institucional.
+ */
+export async function iniciarSesionConGoogle() {
+  const provider = new GoogleAuthProvider();
+  const credencial = await signInWithPopup(auth, provider);
+  await validarSesionInstitucional(credencial.user);
   return credencial;
 }
 
@@ -58,7 +72,7 @@ export async function iniciarSesion(email, password) {
  */
 export async function registrarUsuario(email, password, nombre, institucion) {
   if (!validarDominioInstitucional(email)) {
-    throw new Error('El correo no pertenece a un dominio institucional autorizado por WPA');
+    throw new Error('El correo debe terminar en .edu.co');
   }
 
   // Crear la cuenta en Firebase Auth
@@ -80,6 +94,32 @@ export async function registrarUsuario(email, password, nombre, institucion) {
   });
 
   return credencial;
+}
+
+/**
+ * Completa el registro de un usuario autenticado con Google.
+ * Guarda los datos institucionales en Firestore sin duplicar la cuenta.
+ */
+export async function completarRegistroGoogle({ uid, email, nombre, institucion, fotoURL }) {
+  if (!uid || !email) {
+    throw new Error('No se encontró una sesión válida de Google');
+  }
+
+  await setDoc(
+    doc(db, 'usuarios', uid),
+    {
+      uid,
+      email,
+      nombre: nombre || email.split('@')[0],
+      rol: 'Estudiante',
+      estado: 'active',
+      creadoEn: new Date().toISOString(),
+      institucion,
+      fotoURL: fotoURL || null,
+      proveedor: 'google',
+    },
+    { merge: true }
+  );
 }
 
 export function obtenerRutaDashboardPorRol(rol) {
