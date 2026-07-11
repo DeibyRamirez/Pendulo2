@@ -11,7 +11,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Home
+  Home,
+  Bot
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Reservas", href: "/dashboard/reservas", icon: Calendar },
   { name: "Mis Reservas", href: "/dashboard/mis-reservas", icon: Calendar },
   { name: "Historial", href: "/dashboard/historial", icon: History },
+  { name: "Agente IA", href: "/dashboard/agente-ia", icon: Bot },
 ]
 
 export function DashboardSidebar() {

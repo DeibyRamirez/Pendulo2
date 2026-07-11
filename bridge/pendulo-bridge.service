@@ -1,0 +1,19 @@
+[Unit]
+Description=UAC Pendulum Lab - Bridge MQTT <-> Firestore
+After=network-online.target mosquitto.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/pendulo-bridge
+ExecStart=/usr/bin/node /home/pi/pendulo-bridge/src/index.js
+EnvironmentFile=/home/pi/pendulo-bridge/.env
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pendulo-bridge
+
+[Install]
+WantedBy=multi-user.target

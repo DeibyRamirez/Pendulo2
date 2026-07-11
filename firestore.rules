@@ -2,6 +2,8 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ─── Helpers de autenticación ──────────────────────────────────────────
     function isSignedIn() {
       return request.auth != null;
     }
@@ -18,14 +20,19 @@ service cloud.firestore {
       return myRole() == "Admin";
     }
 
-    function isDocenteOrAdmin() {
-      return myRole() == "Docente" || isAdmin();
+    function isDocente() {
+      return myRole() == "Docente";
     }
 
-    function isReservationOwner(data) {
+    function isDocenteOrAdmin() {
+      return isDocente() || isAdmin();
+    }
+
+    function isOwner(data) {
       return isSignedIn() && data.usuario_id == request.auth.uid;
     }
 
+    // ─── Validadores de valores ────────────────────────────────────────────
     function validRole(rol) {
       return rol in ["Estudiante", "Docente", "Admin"];
     }
@@ -43,10 +50,17 @@ service cloud.firestore {
     }
 
     function validReservationDuration(startTs, endTs) {
-      return endTs > startTs && (endTs.toMillis() - startTs.toMillis()) <= 30 * 60 * 1000;
+      return endTs > startTs
+        && (endTs.toMillis() - startTs.toMillis()) <= 30 * 60 * 1000;
     }
 
+    function validComandoAccion(accion) {
+      return accion in ["configurar", "iniciar", "detener"];
+    }
+
+    // ─── Usuarios ──────────────────────────────────────────────────────────
     match /usuarios/{uid} {
+      // Creación: el propio usuario crea su documento (email+password o Google)
       allow create: if isSignedIn()
         && request.auth.uid == uid
         && request.resource.data.uid == request.auth.uid
@@ -55,8 +69,11 @@ service cloud.firestore {
         && request.resource.data.rol == "Estudiante"
         && request.resource.data.estado == "active";
 
-      allow read: if isSignedIn() && (request.auth.uid == uid || isDocenteOrAdmin());
+      // Lectura: el propio usuario o un Docente/Admin
+      allow read: if isSignedIn()
+        && (request.auth.uid == uid || isDocenteOrAdmin());
 
+      // Actualización de rol/estado: solo Admin
       allow update: if isAdmin()
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.email == resource.data.email
@@ -66,8 +83,10 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ─── Péndulos ──────────────────────────────────────────────────────────
     match /pendulos/{penduloId} {
       allow read: if true;
+
       allow create, delete: if isAdmin()
         && validPenduloEstado(request.resource.data.estado);
 
@@ -80,42 +99,88 @@ service cloud.firestore {
         && request.resource.data.longitud == resource.data.longitud;
     }
 
+    // ─── Reservaciones ─────────────────────────────────────────────────────
     match /reservaciones/{reservacionId} {
-      allow read: if isSignedIn() && (isReservationOwner(resource.data) || isDocenteOrAdmin());
 
+      // READ
+      // - Docentes y Admins pueden leer cualquier reservación (queries globales).
+      // - Un estudiante solo puede leer sus propias reservaciones.
+      //   Para que onSnapshot con where('usuario_id','==',uid) funcione,
+      //   la regla sobre el documento individual también debe pasar.
+      allow read: if isSignedIn()
+        && (isDocenteOrAdmin() || resource.data.usuario_id == request.auth.uid);
+
+      // CREATE
+      // - El usuario debe estar autenticado.
+      // - usuario_id debe ser el propio UID.
+      // - El estado inicial debe ser "pending".
+      // - Las fechas deben ser Timestamps válidos y la duración <= 30 min.
+      // - La institución se toma directamente del token o del documento;
+      //   se acepta cualquier string no vacío para no bloquear usuarios
+      //   cuyo documento aún está siendo creado (ej. flujo Google).
       allow create: if isSignedIn()
         && request.resource.data.usuario_id == request.auth.uid
-        && request.resource.data.institucion == userDoc(request.auth.uid).data.institucion
+        && request.resource.data.institucion is string
+        && request.resource.data.institucion.size() > 0
         && validReservationEstado(request.resource.data.estado)
         && request.resource.data.estado == "pending"
         && request.resource.data.inicio_sesion_reserva is timestamp
         && request.resource.data.final_sesion_reserva is timestamp
         && validReservationDuration(
-          request.resource.data.inicio_sesion_reserva,
-          request.resource.data.final_sesion_reserva
-        );
+             request.resource.data.inicio_sesion_reserva,
+             request.resource.data.final_sesion_reserva
+           );
 
+      // UPDATE
+      // - Solo el dueño o un Docente/Admin puede modificar.
+      // - Los campos de identidad (usuario, institución, péndulo, fechas) son inmutables.
+      // - Solo se permite cambiar el estado a un valor válido.
       allow update: if isSignedIn()
-        && (isReservationOwner(resource.data) || isDocenteOrAdmin())
+        && (isOwner(resource.data) || isDocenteOrAdmin())
         && resource.data.usuario_id == request.resource.data.usuario_id
         && resource.data.institucion == request.resource.data.institucion
         && resource.data.pendulo_id == request.resource.data.pendulo_id
         && resource.data.inicio_sesion_reserva == request.resource.data.inicio_sesion_reserva
         && resource.data.final_sesion_reserva == request.resource.data.final_sesion_reserva
-        && validReservationEstado(request.resource.data.estado)
-        && validReservationDuration(
-          request.resource.data.inicio_sesion_reserva,
-          request.resource.data.final_sesion_reserva
-        );
+        && validReservationEstado(request.resource.data.estado);
 
       allow delete: if isAdmin();
     }
 
+    // ─── Datos del péndulo (solo lectura pública) ──────────────────────────
+    // Escritos exclusivamente por el bridge MQTT->Firestore (Admin SDK,
+    // se salta estas reglas). El cliente web solo lee (onSnapshot).
     match /pendulo_data/{dataId} {
       allow read: if true;
+
+      // Histórico de lecturas (series de tiempo) de cada péndulo.
+      match /lecturas/{lecturaId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
       allow write: if false;
     }
 
+    // ─── Comandos hacia el péndulo (Web -> Raspberry Pi) ───────────────────
+    // El estudiante con turno activo crea un comando "pendiente"; el bridge
+    // (Admin SDK) lo lee, lo publica por MQTT y actualiza su estado a
+    // "enviado" o "error". El cliente nunca puede marcarlo como enviado.
+    match /pendulo_comandos/{comandoId} {
+      allow read: if isSignedIn()
+        && (isDocenteOrAdmin() || resource.data.usuarioId == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.penduloId is string
+        && request.resource.data.penduloId.size() > 0
+        && validComandoAccion(request.resource.data.accion)
+        && request.resource.data.estado == "pendiente";
+
+      allow update, delete: if false;
+    }
+
+    // ─── Catch-all: denegar todo lo demás ─────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

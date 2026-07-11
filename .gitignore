@@ -9,7 +9,15 @@ __v0_jsx-dev-runtime.ts
 next.user-config.*
 
 # Environment variables
+.env
 .env.local
+.env*.local
+
+# Firebase / GCP service account keys (never commit)
+*firebase-adminsdk*.json
+*-firebase-*.json
+pendulo-*-*.json
+serviceAccount*.json
 
 # Common ignores
 node_modules/

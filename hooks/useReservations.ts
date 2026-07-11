@@ -49,7 +49,7 @@ interface UseReservationsResult {
  */
 export function useReservations(usuario_id: string): UseReservationsResult {
   const [reservaciones, setReservaciones] = useState<Reservacion[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Escuchar cambios en tiempo real de las reservaciones
@@ -57,10 +57,17 @@ export function useReservations(usuario_id: string): UseReservationsResult {
     if (!usuario_id) return;
 
     setLoading(true);
-    const unsubscribe = escucharReservacionesUsuario(usuario_id, (data: Reservacion[]) => {
-      setReservaciones(data || []);
-      setLoading(false);
-    });
+    const unsubscribe = escucharReservacionesUsuario(
+      usuario_id,
+      (data: Reservacion[]) => {
+        setReservaciones(data || []);
+        setLoading(false);
+      },
+      (err: Error) => {
+        setError(err.message || 'Error al escuchar reservaciones');
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, [usuario_id]);

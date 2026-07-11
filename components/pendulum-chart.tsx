@@ -26,12 +26,31 @@ function generateInitialData() {
   return data
 }
 
-export function PendulumChart() {
-  const [data, setData] = useState(generateInitialData())
+export interface PendulumChartDataPoint {
+  time: string
+  angle: number
+  velocity: number
+}
+
+interface PendulumChartProps {
+  /**
+   * Datos reales (ej. provenientes de Firestore vía usePenduloData). Si se
+   * provee, se muestran tal cual y NO se genera/simula nada localmente.
+   * Si se omite, el componente cae de vuelta a datos de demostración
+   * (usado en vistas públicas/preview sin sesión activa).
+   */
+  data?: PendulumChartDataPoint[]
+}
+
+export function PendulumChart({ data: externalData }: PendulumChartProps = {}) {
+  const [simulatedData, setSimulatedData] = useState(generateInitialData())
+  const usingRealData = Array.isArray(externalData)
 
   useEffect(() => {
+    if (usingRealData) return
+
     const interval = setInterval(() => {
-      setData((prevData) => {
+      setSimulatedData((prevData) => {
         const newData = [...prevData.slice(1)]
         const lastTime = parseFloat(prevData[prevData.length - 1].time)
         const newTime = lastTime + 0.1
@@ -48,7 +67,17 @@ export function PendulumChart() {
     }, 100)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [usingRealData])
+
+  const data = usingRealData ? externalData! : simulatedData
+
+  if (usingRealData && data.length === 0) {
+    return (
+      <div className="h-[300px] w-full flex items-center justify-center text-sm text-muted-foreground">
+        Esperando datos del péndulo...
+      </div>
+    )
+  }
 
   return (
     <div className="h-[300px] w-full">

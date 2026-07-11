@@ -109,9 +109,10 @@ export default function DashboardAdminPage() {
       setUsuarios(data);
     });
 
-    const unsubReservas = (escucharTodasReservaciones as unknown as (cb: (data: Reservacion[]) => void) => () => void)((data) => {
-      setReservaciones(data);
-    });
+    const unsubReservas = (escucharTodasReservaciones as unknown as (cb: (data: Reservacion[]) => void, onErr: (e: Error) => void) => () => void)(
+      (data) => { setReservaciones(data); },
+      (err) => console.error('Error escuchando reservaciones en admin:', err)
+    );
 
     return () => {
       unsubPendulos();

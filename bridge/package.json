@@ -1,0 +1,17 @@
+{
+  "name": "pendulo-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bridge MQTT <-> Firestore para el UAC Pendulum Lab. Corre en la Raspberry Pi: consume telemetria del broker Mosquitto local y la persiste en Firestore; escucha comandos en Firestore y los publica de vuelta al broker.",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "firebase-admin": "^13.0.2",
+    "mqtt": "^5.10.3"
+  }
+}

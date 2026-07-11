@@ -23,6 +23,7 @@ import {
   crearReservacion,
   cancelarReservacion,
   escucharTodasReservaciones,
+  escucharReservacionesUsuario,
 } from "@/app/services/reservacionService"
 import { escucharUsuarios } from "@/app/services/usuarioService"
 import type { Timestamp } from "firebase/firestore"
@@ -118,12 +119,31 @@ export default function ReservasPage() {
   useEffect(() => {
     if (!user?.uid) return
 
-    const unsub = escucharTodasReservaciones((data: Reservacion[]) => {
-      setReservaciones(data)
-    })
-
-    return () => unsub()
-  }, [user?.uid])
+    if (esDocenteOAdmin) {
+      const unsub = escucharTodasReservaciones(
+        (data: Reservacion[]) => { setReservaciones(data) },
+        (err: Error) => {
+          console.error('Error escuchando todas las reservaciones:', err)
+          setError('Error al cargar reservaciones.')
+        }
+      )
+      return () => unsub()
+    } else {
+      const unsub = (escucharReservacionesUsuario as unknown as (
+        uid: string,
+        cb: (data: Reservacion[]) => void,
+        onErr: (e: Error) => void
+      ) => () => void)(
+        user.uid,
+        (data: Reservacion[]) => { setReservaciones(data) },
+        (err: Error) => {
+          console.error('Error escuchando reservaciones del usuario:', err)
+          setError('Error al cargar tus reservaciones.')
+        }
+      )
+      return () => unsub()
+    }
+  }, [user?.uid, esDocenteOAdmin])
 
   useEffect(() => {
     if (!esDocenteOAdmin) return
@@ -190,6 +210,10 @@ export default function ReservasPage() {
 
   const handleReservation = async () => {
     if (!selectedDate || !selectedTime || !user) return
+    if (!user.institucion) {
+      setError("Tu perfil no tiene institución registrada. Ve a tu perfil y completa tu información antes de reservar.")
+      return
+    }
     setError(null)
     setLoading(true)
     try {
@@ -204,7 +228,7 @@ export default function ReservasPage() {
         inicio_sesion_reserva: inicio,
         final_sesion_reserva: fin,
         estado: "pending",
-        institucion: user.institucion ?? "Sin institución",
+        institucion: user.institucion,
         pendulo_id: PENDULO_ID,
       })
 

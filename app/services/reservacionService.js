@@ -2,6 +2,7 @@ import {
   doc,
   setDoc,
   addDoc,
+  getDoc,
   collection,
   query,
   where,
@@ -37,9 +38,6 @@ export async function crearReservacion(reservationData) {
     if (duracionMinutos > 30) {
       throw new Error('Las sesiones no pueden exceder 30 minutos');
     }
-
-    // Validar que no haya conflictos de horarios
-    await validarConflictosHorario(pendulo_id, inicioTimestamp, finalTimestamp);
 
     // Crear documento en la colección 'reservaciones'
     const docRef = await addDoc(collection(db, 'reservaciones'), {
@@ -178,19 +176,19 @@ export async function cancelarReservacion(reservacion_id) {
  */
 export async function eliminarReservacion(reservacion_id) {
   try {
-    // Verificar que la reservación esté en estado pending antes de eliminar
-    const docSnap = await getDocs(query(collection(db, 'reservaciones'), where('__name__', '==', reservacion_id)));
-    
-    if (docSnap.empty) {
+    const docRef = doc(db, 'reservaciones', reservacion_id);
+    const docSnap = await getDoc(docRef);
+
+    if (!docSnap.exists()) {
       throw new Error('Reservación no encontrada');
     }
 
-    const reservacion = docSnap.docs[0].data();
+    const reservacion = docSnap.data();
     if (reservacion.estado !== 'pending') {
       throw new Error('Solo se pueden eliminar reservaciones en estado pending');
     }
 
-    await deleteDoc(doc(db, 'reservaciones', reservacion_id));
+    await deleteDoc(docRef);
   } catch (error) {
     console.error('Error al eliminar reservación:', error);
     throw error;
@@ -240,7 +238,7 @@ export async function validarConflictosHorario(pendulo_id, inicio, final) {
  * @param {Function} callback - Función a ejecutar cuando hay cambios
  * @returns {Function} Función para desuscribirse
  */
-export function escucharReservacionesUsuario(usuario_id, callback) {
+export function escucharReservacionesUsuario(usuario_id, callback, onError) {
   const q = query(collection(db, 'reservaciones'), where('usuario_id', '==', usuario_id));
   
   return onSnapshot(q, (querySnapshot) => {
@@ -254,6 +252,7 @@ export function escucharReservacionesUsuario(usuario_id, callback) {
     callback(reservaciones);
   }, (error) => {
     console.error('Error al escuchar reservaciones:', error);
+    if (onError) onError(error);
   });
 }
 
@@ -262,7 +261,7 @@ export function escucharReservacionesUsuario(usuario_id, callback) {
  * @param {Function} callback - Funcion a ejecutar cuando hay cambios
  * @returns {Function} Funcion para desuscribirse
  */
-export function escucharTodasReservaciones(callback) {
+export function escucharTodasReservaciones(callback, onError) {
   return onSnapshot(
     collection(db, 'reservaciones'),
     (querySnapshot) => {
@@ -277,6 +276,7 @@ export function escucharTodasReservaciones(callback) {
     },
     (error) => {
       console.error('Error al escuchar todas las reservaciones:', error);
+      if (onError) onError(error);
     }
   );
 }
