@@ -28,7 +28,7 @@ import {
   AlertTriangle,
   Clock,
 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   LineChart,
   Line,
@@ -42,11 +42,21 @@ import { CameraStream } from "@/components/camera-stream"
 import { useAuth } from "@/hooks/useAuth"
 import { usePenduloData } from "@/hooks/usePenduloData"
 import { escucharReservacionesUsuario } from "@/app/services/reservacionService"
+import { escucharEstadoComando } from "@/app/services/penduloDataService"
 import type { Timestamp } from "firebase/firestore"
+import {
+  checkFirebaseEnv,
+  logBridgeCommandState,
+  logSessionStart,
+  logSignalChange,
+  penduloDiag,
+  resolveSignalState,
+  type SignalState,
+} from "@/lib/penduloDiagnostics"
 
 // Debe coincidir con DEFAULT_PENDULO_ID configurado en el bridge (bridge/.env)
 const DEFAULT_PENDULO_ID = "UAC-01"
-// Umbral para considerar que el péndulo está "en vivo" (sin señal = bridge/broker caído)
+// Umbral para considerar que el péndulo está "en vivo" (sin uso = bridge/broker caído)
 const SEGUNDOS_SIN_SENAL = 10
 
 // Límites de seguridad para no dañar el mecanismo físico (láser/microswitch).
@@ -62,6 +72,21 @@ const DISTANCIA_MURO_MAX = 15
 // medio de esta espera, se corta la práctica antes de que arranque de
 // verdad. Bloqueamos "Finalizar práctica" mientras dure esta cuenta atrás.
 const SEGUNDOS_CONFIGURACION = 15
+// Si el comando sigue "pendiente" tras este tiempo, avisamos (el bridge puede
+// tener el listener de Firestore colgado aunque systemd diga "running").
+const SEGUNDOS_ESPERA_BRIDGE = 30
+
+type EstadoComandoUi = "pendiente" | "enviado" | "error" | null
+
+interface ComandoPenduloDoc {
+  id: string
+  estado?: "pendiente" | "enviado" | "error"
+  errorMsg?: string
+  atendidoEn?: Timestamp
+  penduloId?: string
+  usuarioId?: string
+  accion?: string
+}
 
 interface Reservacion {
   id: string
@@ -89,12 +114,39 @@ function toMillis(ts: Timestamp | undefined): number | null {
 
 export default function RealtimePage() {
   const { user } = useAuth()
+  const [mounted, setMounted] = useState(false)
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [estadoComando, setEstadoComando] = useState<EstadoComandoUi>(null)
+  const [mensajeComando, setMensajeComando] = useState<string | null>(null)
+  const comandoUnsubRef = useRef<(() => void) | null>(null)
+  const comandoPendienteRef = useRef(false)
+  const comandoTimeoutRef = useRef<number | null>(null)
+  const signalStateRef = useRef<SignalState | null>(null)
+  const reservaLoggedRef = useRef<boolean | null>(null)
+  const sessionStartedRef = useRef(false)
+  const estadoDispositivoPrevRef = useRef<string | null>(null)
   const [reservaciones, setReservaciones] = useState<Reservacion[]>([])
   const [oscilaciones, setOscilaciones] = useState(5)
   const [distanciaMuro, setDistanciaMuro] = useState(5)
   const [practicaEnCurso, setPracticaEnCurso] = useState(false)
   const [configurandoHasta, setConfigurandoHasta] = useState<number | null>(null)
   const [nowTick, setNowTick] = useState(() => Date.now())
+
+  // Radix AlertDialog genera IDs distintos en SSR vs cliente; montamos el
+  // diálogo solo en el navegador para evitar hydration mismatch.
+  useEffect(() => {
+    setMounted(true)
+    checkFirebaseEnv()
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      comandoUnsubRef.current?.()
+      if (comandoTimeoutRef.current !== null) {
+        window.clearTimeout(comandoTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Cuenta atrás de los 15s de configuración: solo corre mientras hay una
   // cuenta activa, para no generar renders innecesarios el resto del tiempo.
@@ -109,7 +161,12 @@ export default function RealtimePage() {
     const unsub = (escucharReservacionesUsuario as unknown as (uid: string, cb: (data: Reservacion[]) => void, onErr: (e: Error) => void) => () => void)(
       user.uid,
       (data) => setReservaciones(data),
-      (err) => console.error('Error escuchando reservaciones en realtime:', err)
+      (err) => {
+        penduloDiag.error('Reserva', 'Error escuchando reservaciones del usuario', {
+          usuarioId: user.uid,
+          error: err.message,
+        })
+      }
     )
     return () => unsub()
   }, [user?.uid])
@@ -182,34 +239,228 @@ export default function RealtimePage() {
     distanciaMuro >= DISTANCIA_MURO_MIN &&
     distanciaMuro <= DISTANCIA_MURO_MAX
 
+  // ─── Diagnóstico en consola (DevTools → filtrar "Pendulo") ───────────────
+  useEffect(() => {
+    if (!mounted || sessionStartedRef.current) return
+    sessionStartedRef.current = true
+    logSessionStart({
+      penduloId,
+      defaultPenduloId: DEFAULT_PENDULO_ID,
+      userId: user?.uid ?? null,
+      userEmail: user?.email ?? null,
+    })
+  }, [mounted, penduloId, user?.uid, user?.email])
+
+  useEffect(() => {
+    if (!mounted) return
+    if (user?.uid) {
+      penduloDiag.info("Auth", "Usuario autenticado", { uid: user.uid, email: user.email })
+    } else {
+      penduloDiag.warn("Auth", "Sin sesión activa: los comandos al péndulo estarán bloqueados", {})
+    }
+  }, [mounted, user?.uid, user?.email])
+
+  useEffect(() => {
+    if (!mounted || !user?.uid) return
+    if (puedeIniciar === reservaLoggedRef.current) return
+    reservaLoggedRef.current = puedeIniciar
+
+    if (puedeIniciar && reservaEnTurno) {
+      penduloDiag.info("Reserva", 'Turno activo: botón "Iniciar práctica" habilitado', {
+        reservaId: reservaEnTurno.id,
+        penduloId: reservaEnTurno.pendulo_id ?? DEFAULT_PENDULO_ID,
+        estado: reservaEnTurno.estado,
+        inicio: toDate(reservaEnTurno.inicio_sesion_reserva).toISOString(),
+        fin: toDate(reservaEnTurno.final_sesion_reserva).toISOString(),
+      })
+    } else {
+      penduloDiag.warn("Reserva", 'Fuera de turno: botón "Iniciar práctica" deshabilitado', {
+        reservacionesActivas: reservaciones.filter((r) => r.estado === "pending" || r.estado === "active").length,
+        hint: "Crea una reserva cuyo horario incluya el momento actual.",
+      })
+    }
+  }, [mounted, user?.uid, puedeIniciar, reservaEnTurno, reservaciones])
+
+  useEffect(() => {
+    if (!mounted || parametrosValidos) return
+    penduloDiag.warn("Variables", "Parámetros fuera de rango seguro", {
+      oscilaciones,
+      rangoOscilaciones: `${OSCILACIONES_MIN}-${OSCILACIONES_MAX}`,
+      distanciaMuro,
+      rangoDistancia: `${DISTANCIA_MURO_MIN}-${DISTANCIA_MURO_MAX} cm`,
+    })
+  }, [mounted, parametrosValidos, oscilaciones, distanciaMuro])
+
+  useEffect(() => {
+    if (!mounted) return
+    const signal = resolveSignalState({
+      segundosDesdeUltimoDato,
+      practicaFinalizada,
+      practicaConError,
+      umbralSinSenal: SEGUNDOS_SIN_SENAL,
+    })
+    logSignalChange(signalStateRef.current, signal, {
+      penduloId,
+      segundosDesdeUltimoDato,
+      umbralSinSenal: SEGUNDOS_SIN_SENAL,
+      muestras: enVivo?.muestras,
+    })
+    signalStateRef.current = signal
+  }, [mounted, segundosDesdeUltimoDato, practicaFinalizada, practicaConError, penduloId, enVivo?.muestras])
+
+  useEffect(() => {
+    if (!errorPendulo) return
+    penduloDiag.error("Firestore", errorPendulo, { penduloId })
+  }, [errorPendulo, penduloId])
+
+  useEffect(() => {
+    if (!practicaConError || !enVivo) return
+    penduloDiag.error("Hardware", "El péndulo reportó un error de hardware", {
+      codigo: enVivo.errorCodigo,
+      mensaje: enVivo.errorMensaje,
+      penduloId,
+    })
+  }, [practicaConError, enVivo, penduloId])
+
+  useEffect(() => {
+    if (!enVivo?.estadoDispositivo || enVivo.estadoDispositivo === estadoDispositivoPrevRef.current) return
+    estadoDispositivoPrevRef.current = enVivo.estadoDispositivo
+    penduloDiag.info("Hardware", `Señal del dispositivo: ${enVivo.estadoDispositivo}`, {
+      penduloId,
+      oscilacionesConfirmadas: enVivo.oscilacionesConfirmadas,
+      distanciaConfirmada: enVivo.distanciaMuroConfirmada,
+    })
+  }, [enVivo?.estadoDispositivo, enVivo?.oscilacionesConfirmadas, enVivo?.distanciaMuroConfirmada, penduloId])
+
   const handleStartPractice = async () => {
-    if (!puedeIniciar || !user?.uid || !parametrosValidos || practicaEnCurso) return
+    if (!puedeIniciar || !user?.uid || !parametrosValidos || practicaEnCurso) {
+      penduloDiag.warn("Comando", "Inicio de práctica bloqueado", {
+        puedeIniciar,
+        usuario: user?.uid ?? null,
+        parametrosValidos,
+        practicaEnCurso,
+        oscilaciones,
+        distanciaMuro,
+      })
+      return
+    }
+    setConfirmDialogOpen(false)
+    setEstadoComando(null)
+    setMensajeComando(null)
+    comandoUnsubRef.current?.()
+    if (comandoTimeoutRef.current !== null) {
+      window.clearTimeout(comandoTimeoutRef.current)
+      comandoTimeoutRef.current = null
+    }
     try {
-      await enviarComando({
+      const comandoId = await enviarComando({
         usuarioId: user.uid,
         accion: "iniciar",
         oscilaciones,
         distanciaMuro,
       })
       setPracticaEnCurso(true)
-      // El péndulo (vía Node-RED) espera SEGUNDOS_CONFIGURACION antes de
-      // mandar la orden real de arranque tras la configuración — ver
-      // bridge/node-red-command-flow.json. Bloqueamos "Finalizar práctica"
-      // durante esa ventana para no cortar el arranque antes de tiempo.
       setConfigurandoHasta(Date.now() + SEGUNDOS_CONFIGURACION * 1000)
+      setEstadoComando("pendiente")
+      setMensajeComando("Comando enviado. Esperando confirmación del bridge en la Raspberry Pi…")
+      comandoPendienteRef.current = true
+      logBridgeCommandState("pendiente", { comandoId, penduloId, oscilaciones, distanciaMuro })
+
+      comandoUnsubRef.current = escucharEstadoComando(
+        comandoId,
+        (data: ComandoPenduloDoc | null) => {
+          if (!data?.estado) return
+          if (data.estado === "enviado") {
+            comandoPendienteRef.current = false
+            if (comandoTimeoutRef.current !== null) {
+              window.clearTimeout(comandoTimeoutRef.current)
+              comandoTimeoutRef.current = null
+            }
+            setEstadoComando("enviado")
+            setMensajeComando("Comando recibido por el bridge. El péndulo debería configurarse en unos segundos.")
+            logBridgeCommandState("enviado", { comandoId, penduloId, atendidoEn: data.atendidoEn })
+            penduloDiag.info("Sistema", `Espera ${SEGUNDOS_CONFIGURACION}s antes de que el péndulo se mueva (cfg → str en Node-RED)`, {
+              comandoId,
+            })
+            comandoUnsubRef.current?.()
+            comandoUnsubRef.current = null
+          } else if (data.estado === "error") {
+            comandoPendienteRef.current = false
+            if (comandoTimeoutRef.current !== null) {
+              window.clearTimeout(comandoTimeoutRef.current)
+              comandoTimeoutRef.current = null
+            }
+            setEstadoComando("error")
+            setMensajeComando(
+              typeof data.errorMsg === "string"
+                ? `El bridge no pudo publicar el comando por MQTT: ${data.errorMsg}`
+                : "El bridge no pudo publicar el comando por MQTT."
+            )
+            logBridgeCommandState("error", {
+              comandoId,
+              penduloId,
+              errorMsg: data.errorMsg,
+              posiblesCausas: ["MQTT desconectado en bridge", "Broker Mosquitto caído", "Credenciales MQTT incorrectas"],
+            })
+            setPracticaEnCurso(false)
+            setConfigurandoHasta(null)
+            comandoUnsubRef.current?.()
+            comandoUnsubRef.current = null
+          }
+        },
+        (err: Error) => {
+          comandoPendienteRef.current = false
+          if (comandoTimeoutRef.current !== null) {
+            window.clearTimeout(comandoTimeoutRef.current)
+            comandoTimeoutRef.current = null
+          }
+          setEstadoComando("error")
+          setMensajeComando(err.message || "Error al escuchar el estado del comando.")
+          penduloDiag.error("Firestore", "No se pudo escuchar el estado del comando", {
+            comandoId,
+            error: err.message,
+          })
+          setPracticaEnCurso(false)
+          setConfigurandoHasta(null)
+        }
+      )
+
+      comandoTimeoutRef.current = window.setTimeout(() => {
+        if (!comandoPendienteRef.current) return
+        setEstadoComando("error")
+        setMensajeComando(
+          "El bridge no confirmó el comando en Firestore a tiempo. El servicio puede estar corriendo pero con el listener colgado — en la Pi ejecuta: sudo systemctl restart pendulo-bridge. Si el péndulo sí se movió, ignora este aviso. Revisa pendulo_comandos en Firebase Console."
+        )
+        logBridgeCommandState("timeout", {
+          comandoId,
+          penduloId,
+          segundosEsperados: SEGUNDOS_ESPERA_BRIDGE,
+        })
+      }, SEGUNDOS_ESPERA_BRIDGE * 1000)
     } catch (err) {
-      console.error("Error al enviar comando de inicio:", err)
+      const message = err instanceof Error ? err.message : "Error al enviar comando de inicio."
+      penduloDiag.error("Comando", "Fallo al iniciar práctica", { error: message, penduloId })
+      setEstadoComando("error")
+      setMensajeComando(err instanceof Error ? err.message : "Error al enviar comando de inicio.")
+      setPracticaEnCurso(false)
+      setConfigurandoHasta(null)
     }
   }
 
   const handleEndPractice = async () => {
     if (!user?.uid) return
+    penduloDiag.info("Comando", 'Enviando comando "detener"', { penduloId, usuarioId: user.uid })
     try {
-      await enviarComando({ usuarioId: user.uid, accion: "detener" })
+      const comandoId = await enviarComando({ usuarioId: user.uid, accion: "detener" })
+      logBridgeCommandState("pendiente", { comandoId, accion: "detener", penduloId })
       setPracticaEnCurso(false)
       setConfigurandoHasta(null)
+      penduloDiag.info("Comando", "Práctica finalizada desde la web", { comandoId })
     } catch (err) {
-      console.error("Error al enviar comando de detener:", err)
+      penduloDiag.error("Comando", 'Error al enviar comando "detener"', {
+        error: err instanceof Error ? err.message : String(err),
+        penduloId,
+      })
     }
   }
 
@@ -246,7 +497,7 @@ export default function RealtimePage() {
             ) : (
               <Badge variant="outline" className="border-muted-foreground text-muted-foreground">
                 <WifiOff className="h-3 w-3 mr-1.5" />
-                Sin señal
+                Sin Uso
               </Badge>
             )}
           </div>
@@ -315,45 +566,57 @@ export default function RealtimePage() {
                   className="w-36"
                 />
               </div>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button disabled={!puedeIniciar || enviandoComando || !parametrosValidos || practicaEnCurso}>
-                    {enviandoComando ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Play className="mr-2 h-4 w-4" />
-                    )}
-                    Iniciar práctica
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Confirmas estos parámetros?</AlertDialogTitle>
-                    <AlertDialogDescription asChild>
-                      <div className="space-y-2">
-                        <p>
-                          Se enviará al péndulo <strong>{penduloId}</strong> con:
-                        </p>
-                        <ul className="list-disc pl-5">
-                          <li><strong>{oscilaciones}</strong> oscilaciones</li>
-                          <li><strong>{distanciaMuro}</strong> cm de distancia del muro</li>
-                        </ul>
-                        <p>
-                          El péndulo tarda unos {SEGUNDOS_CONFIGURACION} segundos en configurarse
-                          antes de empezar a moverse — no podrás finalizar la práctica hasta que
-                          termine esa configuración inicial.
-                        </p>
-                      </div>
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Revisar valores</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleStartPractice}>
-                      Sí, iniciar práctica
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              {mounted ? (
+                <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button disabled={!puedeIniciar || enviandoComando || !parametrosValidos || practicaEnCurso}>
+                      {enviandoComando ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Play className="mr-2 h-4 w-4" />
+                      )}
+                      Iniciar práctica
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Confirmas estos parámetros?</AlertDialogTitle>
+                      <AlertDialogDescription asChild>
+                        <div className="space-y-2">
+                          <p>
+                            Se enviará al péndulo <strong>{penduloId}</strong> con:
+                          </p>
+                          <ul className="list-disc pl-5">
+                            <li><strong>{oscilaciones}</strong> oscilaciones</li>
+                            <li><strong>{distanciaMuro}</strong> cm de distancia del muro</li>
+                          </ul>
+                          <p>
+                            El péndulo tarda unos {SEGUNDOS_CONFIGURACION} segundos en configurarse
+                            antes de empezar a moverse — no podrás finalizar la práctica hasta que
+                            termine esa configuración inicial.
+                          </p>
+                        </div>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Revisar valores</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={(event) => {
+                          event.preventDefault()
+                          void handleStartPractice()
+                        }}
+                      >
+                        Sí, iniciar práctica
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <Button disabled>
+                  <Play className="mr-2 h-4 w-4" />
+                  Iniciar práctica
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={handleEndPractice}
@@ -378,6 +641,22 @@ export default function RealtimePage() {
               </div>
             </div>
           </div>
+          {mensajeComando && (
+            <p
+              className={`text-xs flex items-center gap-1.5 font-medium ${
+                estadoComando === "error"
+                  ? "text-destructive"
+                  : estadoComando === "enviado"
+                    ? "text-chart-2"
+                    : "text-primary"
+              }`}
+            >
+              {estadoComando === "pendiente" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {estadoComando === "enviado" && <CheckCircle2 className="h-3.5 w-3.5" />}
+              {estadoComando === "error" && <AlertTriangle className="h-3.5 w-3.5" />}
+              {mensajeComando}
+            </p>
+          )}
           {segundosConfigurando > 0 && (
             <p className="text-xs text-primary flex items-center gap-1.5 font-medium">
               <Clock className="h-3.5 w-3.5" />

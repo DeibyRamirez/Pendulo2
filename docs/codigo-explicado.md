@@ -160,7 +160,7 @@ del bridge que usa el Admin SDK):
 Hook de React que envuelve el servicio anterior para un componente:
 expone `enVivo`, `lecturas`, `loading`, `error`,
 `segundosDesdeUltimoDato` (calculado con un `setInterval` de 1s comparando
-contra `enVivo.actualizadoEn`, para poder mostrar "sin señal" si el bridge
+contra `enVivo.actualizadoEn`, para poder mostrar "sin uso" si el bridge
 o el péndulo se caen), y `enviarComando`/`enviandoComando`. Se
 desuscribe de ambos `onSnapshot` en el `useEffect` de limpieza.
 
@@ -186,7 +186,7 @@ Página del dashboard que consume `usePenduloData`. Contiene:
   libera solo cuando termina la cuenta atrás, o antes si `enVivo.estado`
   ya confirma `"finalizado"`/`"error"`.
 - Badge de estado derivado de `enVivo.estado` y `segundosDesdeUltimoDato`:
-  "En vivo" | "Práctica finalizada" | "Error de hardware" | "Sin señal".
+  "En vivo" | "Práctica finalizada" | "Error de hardware" | "Sin uso".
 - Línea adicional con `enVivo.estadoDispositivo` (si existe) mostrando la
   última confirmación del hardware ("Péndulo confirmó el inicio", etc.) —
   solo aparece si se agregó `bridge/node-red-estado-flow.json` en

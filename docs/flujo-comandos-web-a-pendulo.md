@@ -38,7 +38,7 @@ Esto es trabajo de instalación, no algo que se repita por cada práctica:
    `bridge/node-red-estado-flow.json` para que Node-RED también avise por
    MQTT cuando el péndulo confirma el inicio (`STROK`) y el fin (`END`) de
    la práctica, en vez de que la web solo lo infiera por un timeout de
-   "sin señal". Ver sección 5 de `bridge/README.md`.
+   "sin uso". Ver sección 5 de `bridge/README.md`.
 
 Después de estos 3 pasos, **no hace falta volver a tocar Node-RED** para
 usos normales. Todo lo que sigue pasa solo.

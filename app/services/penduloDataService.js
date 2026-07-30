@@ -67,6 +67,38 @@ export function escucharLecturasRecientes(penduloId, cantidad, callback, onError
 }
 
 /**
+ * @typedef {Object} ComandoPenduloSnapshot
+ * @property {string} id
+ * @property {'pendiente'|'enviado'|'error'} [estado]
+ * @property {string} [errorMsg]
+ * @property {import('firebase/firestore').Timestamp} [atendidoEn]
+ * @property {string} [penduloId]
+ * @property {string} [usuarioId]
+ * @property {string} [accion]
+ */
+
+/**
+ * Escuchar el estado de un comando ya creado (pendiente → enviado | error).
+ * Útil para confirmar que el bridge en la Raspberry Pi lo procesó.
+ * @param {string} comandoId
+ * @param {(data: ComandoPenduloSnapshot | null) => void} callback
+ * @param {(error: Error) => void} [onError]
+ * @returns {() => void} función para desuscribirse
+ */
+export function escucharEstadoComando(comandoId, callback, onError) {
+  return onSnapshot(
+    doc(db, 'pendulo_comandos', comandoId),
+    (docSnap) => {
+      callback(docSnap.exists() ? { id: docSnap.id, ...docSnap.data() } : null);
+    },
+    (error) => {
+      console.error('Error al escuchar estado del comando:', error);
+      if (onError) onError(error);
+    }
+  );
+}
+
+/**
  * Enviar un comando desde la web hacia el péndulo (el bridge en la
  * Raspberry Pi lo recoge y lo publica por MQTT hacia Node-RED).
  * @param {Object} comando

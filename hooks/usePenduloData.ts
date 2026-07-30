@@ -7,6 +7,7 @@ import {
   escucharLecturasRecientes,
   enviarComandoPendulo,
 } from '@/app/services/penduloDataService';
+import { penduloDiag } from '@/lib/penduloDiagnostics';
 
 export type EstadoComando = 'pendiente' | 'enviado' | 'error';
 export type AccionComando = 'configurar' | 'iniciar' | 'detener';
@@ -79,7 +80,7 @@ interface UsePenduloDataResult {
   error: string | null;
   /** Segundos desde la última actualización recibida del péndulo (null si nunca llegó dato) */
   segundosDesdeUltimoDato: number | null;
-  enviarComando: (input: EnviarComandoInput) => Promise<void>;
+  enviarComando: (input: EnviarComandoInput) => Promise<string>;
   enviandoComando: boolean;
   clearError: () => void;
 }
@@ -99,16 +100,44 @@ export function usePenduloData(penduloId: string, cantidadLecturas = 50): UsePen
   const [ahora, setAhora] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!penduloId) return;
+    if (!penduloId) {
+      penduloDiag.warn('Firestore', 'penduloId vacío: no se pueden suscribir listeners.', {});
+      return;
+    }
+
+    penduloDiag.info('Firestore', `Suscribiendo listeners para péndulo ${penduloId}`, {
+      docEnVivo: `pendulo_data/${penduloId}`,
+      subcoleccion: `pendulo_data/${penduloId}/lecturas`,
+      cantidadLecturas,
+    });
 
     setLoading(true);
+    let hadLiveDoc = false;
     const unsubEnVivo = escucharPenduloEnVivo(
       penduloId,
       (data: PenduloEnVivo | null) => {
+        if (data) {
+          if (!hadLiveDoc) {
+            hadLiveDoc = true;
+            penduloDiag.info('Firestore', 'Documento en vivo encontrado', {
+              penduloId,
+              muestras: data.muestras,
+              estado: data.estado,
+            });
+          }
+        } else if (!hadLiveDoc) {
+          penduloDiag.warn('Firestore', `Sin documento en pendulo_data/${penduloId} todavía`, {
+            hint: 'Normal si el bridge nunca escribió telemetría para este péndulo.',
+          });
+        }
         setEnVivo(data);
         setLoading(false);
       },
       (err: Error) => {
+        penduloDiag.error('Firestore', 'Error en listener de estado en vivo', {
+          penduloId,
+          error: err.message,
+        });
         setError(err.message || 'Error al escuchar el péndulo');
         setLoading(false);
       }
@@ -118,17 +147,24 @@ export function usePenduloData(penduloId: string, cantidadLecturas = 50): UsePen
       penduloId,
       cantidadLecturas,
       (data: LecturaPendulo[]) => setLecturas(data),
-      (err: Error) => setError(err.message || 'Error al escuchar lecturas del péndulo')
+      (err: Error) => {
+        penduloDiag.error('Firestore', 'Error en listener de lecturas históricas', {
+          penduloId,
+          error: err.message,
+        });
+        setError(err.message || 'Error al escuchar lecturas del péndulo');
+      }
     );
 
     return () => {
+      penduloDiag.info('Firestore', `Desuscribiendo listeners de ${penduloId}`, {});
       unsubEnVivo();
       unsubLecturas();
     };
   }, [penduloId, cantidadLecturas]);
 
   // Reloj para poder derivar "hace cuánto llegó el último dato" en la UI
-  // (ej. para mostrar "sin señal" si el péndulo/bridge se cae).
+  // (ej. para mostrar "sin uso" si el péndulo/bridge se cae).
   useEffect(() => {
     const interval = setInterval(() => setAhora(Date.now()), 1000);
     return () => clearInterval(interval);
@@ -145,15 +181,34 @@ export function usePenduloData(penduloId: string, cantidadLecturas = 50): UsePen
       try {
         setError(null);
         setEnviandoComando(true);
-        await enviarComandoPendulo({
+        penduloDiag.info('Comando', `Enviando comando "${input.accion}" a Firestore`, {
+          penduloId,
+          usuarioId: input.usuarioId,
+          oscilaciones: input.oscilaciones,
+          distanciaMuro: input.distanciaMuro,
+          coleccion: 'pendulo_comandos',
+        });
+        const comandoId = await enviarComandoPendulo({
           penduloId,
           usuarioId: input.usuarioId,
           accion: input.accion,
           oscilaciones: input.oscilaciones,
           distanciaMuro: input.distanciaMuro,
         });
+        penduloDiag.info('Comando', 'Documento de comando creado en Firestore', {
+          comandoId,
+          estadoInicial: 'pendiente',
+        });
+        return comandoId;
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Error al enviar comando al péndulo');
+        const message = err instanceof Error ? err.message : 'Error al enviar comando al péndulo';
+        penduloDiag.error('Comando', 'No se pudo crear el documento en Firestore', {
+          penduloId,
+          accion: input.accion,
+          error: message,
+          posiblesCausas: ['Reglas de Firestore', 'Usuario no autenticado', 'Sin conexión a internet'],
+        });
+        setError(message);
         throw err;
       } finally {
         setEnviandoComando(false);
