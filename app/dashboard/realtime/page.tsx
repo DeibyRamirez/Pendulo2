@@ -66,17 +66,19 @@ const OSCILACIONES_MAX = 20
 const DISTANCIA_MURO_MIN = 1
 const DISTANCIA_MURO_MAX = 15
 
-// Node-RED espera 15s entre enviar la configuración (cfg) y la orden de
-// inicio (str) al péndulo (ver bridge/node-red-command-flow.json). Durante
-// esta ventana el péndulo todavía no se mueve; si se manda "detener" en
-// medio de esta espera, se corta la práctica antes de que arranque de
-// verdad. Bloqueamos "Finalizar práctica" mientras dure esta cuenta atrás.
-const SEGUNDOS_CONFIGURACION = 15
+// Node-RED: cfg → espera → str (bridge/node-red-command-flow.json).
+const SEGUNDOS_CFG_NODE_RED = 15
+// Tiempo aprox. desde str hasta la 1ª muestra en Firestore (hardware + 1ª oscilación).
+const SEGUNDOS_ARRANQUE_HARDWARE = 11
+const SEGUNDOS_ESPERA_ARRANQUE_TOTAL = SEGUNDOS_CFG_NODE_RED + SEGUNDOS_ARRANQUE_HARDWARE
+/** @deprecated Usar SEGUNDOS_CFG_NODE_RED; alias para bloqueo de "Finalizar". */
+const SEGUNDOS_CONFIGURACION = SEGUNDOS_CFG_NODE_RED
 // Si el comando sigue "pendiente" tras este tiempo, avisamos (el bridge puede
 // tener el listener de Firestore colgado aunque systemd diga "running").
 const SEGUNDOS_ESPERA_BRIDGE = 30
 
 type EstadoComandoUi = "pendiente" | "enviado" | "error" | null
+type FaseArranque = "configurando" | "arrancando" | "listo" | "demora"
 
 interface ComandoPenduloDoc {
   id: string
@@ -129,7 +131,7 @@ export default function RealtimePage() {
   const [oscilaciones, setOscilaciones] = useState(5)
   const [distanciaMuro, setDistanciaMuro] = useState(5)
   const [practicaEnCurso, setPracticaEnCurso] = useState(false)
-  const [configurandoHasta, setConfigurandoHasta] = useState<number | null>(null)
+  const [arranqueIniciadoEn, setArranqueIniciadoEn] = useState<number | null>(null)
   const [nowTick, setNowTick] = useState(() => Date.now())
 
   // Radix AlertDialog genera IDs distintos en SSR vs cliente; montamos el
@@ -148,13 +150,12 @@ export default function RealtimePage() {
     }
   }, [])
 
-  // Cuenta atrás de los 15s de configuración: solo corre mientras hay una
-  // cuenta activa, para no generar renders innecesarios el resto del tiempo.
+  // Reloj para la cuenta atrás de arranque (~26 s total).
   useEffect(() => {
-    if (configurandoHasta === null) return
+    if (arranqueIniciadoEn === null) return
     const interval = setInterval(() => setNowTick(Date.now()), 250)
     return () => clearInterval(interval)
-  }, [configurandoHasta])
+  }, [arranqueIniciadoEn])
 
   useEffect(() => {
     if (!user?.uid) return
@@ -195,6 +196,37 @@ export default function RealtimePage() {
   const hayDatosEnVivo =
     !practicaFinalizada && !practicaConError && segundosDesdeUltimoDato !== null && segundosDesdeUltimoDato < SEGUNDOS_SIN_SENAL
 
+  /** Telemetría nueva tras pulsar "Iniciar" (evita marcar listo con datos viejos). */
+  const arranqueListo = (() => {
+    if (!practicaEnCurso || arranqueIniciadoEn === null || !hayDatosEnVivo) return false
+    const actualizadoMs = enVivo?.actualizadoEn?.toDate?.()?.getTime()
+    return typeof actualizadoMs === "number" && actualizadoMs >= arranqueIniciadoEn
+  })()
+
+  const elapsedArranqueSeg =
+    arranqueIniciadoEn !== null ? Math.max(0, (nowTick - arranqueIniciadoEn) / 1000) : 0
+
+  const segundosRestantesTotal =
+    arranqueIniciadoEn !== null && !arranqueListo
+      ? Math.max(0, Math.ceil(SEGUNDOS_ESPERA_ARRANQUE_TOTAL - elapsedArranqueSeg))
+      : 0
+
+  const segundosBloqueoFinalizar =
+    arranqueIniciadoEn !== null
+      ? Math.max(0, Math.ceil(SEGUNDOS_CFG_NODE_RED - elapsedArranqueSeg))
+      : 0
+
+  const faseArranque: FaseArranque | null = (() => {
+    if (!practicaEnCurso || arranqueIniciadoEn === null) return null
+    if (arranqueListo) return "listo"
+    if (elapsedArranqueSeg < SEGUNDOS_CFG_NODE_RED) return "configurando"
+    if (elapsedArranqueSeg < SEGUNDOS_ESPERA_ARRANQUE_TOTAL) return "arrancando"
+    return "demora"
+  })()
+
+  const mostrarPanelArranque =
+    practicaEnCurso && arranqueIniciadoEn !== null && !practicaFinalizada && !practicaConError
+
   // Texto legible de la última señal de confirmación del hardware (handshake
   // serial reenviado por Node-RED vía "pendulo/estado"). Puede no existir
   // todavía si Node-RED no está reenviando estas señales al broker.
@@ -211,25 +243,11 @@ export default function RealtimePage() {
     ? ESTADO_DISPOSITIVO_LABEL[enVivo.estadoDispositivo] ?? null
     : null
 
-  const segundosConfigurando = configurandoHasta
-    ? Math.max(0, Math.ceil((configurandoHasta - nowTick) / 1000))
-    : 0
-
-  // Apenas termina la cuenta atrás, dejamos de bloquear "Finalizar práctica"
-  // (el péndulo ya debería haber recibido la orden real de inicio "str").
-  useEffect(() => {
-    if (configurandoHasta !== null && Date.now() >= configurandoHasta) {
-      setConfigurandoHasta(null)
-    }
-  }, [nowTick, configurandoHasta])
-
-  // Si el hardware confirma fin de práctica o error (por telemetría real o
-  // por el flujo opcional de "pendulo/estado"), soltamos el bloqueo de los
-  // botones aunque el estudiante no haya dado clic en "Finalizar".
+  // Limpia el panel de arranque cuando termina la práctica.
   useEffect(() => {
     if (enVivo?.estado === "finalizado" || enVivo?.estado === "error") {
       setPracticaEnCurso(false)
-      setConfigurandoHasta(null)
+      setArranqueIniciadoEn(null)
     }
   }, [enVivo?.estado])
 
@@ -360,7 +378,7 @@ export default function RealtimePage() {
         distanciaMuro,
       })
       setPracticaEnCurso(true)
-      setConfigurandoHasta(Date.now() + SEGUNDOS_CONFIGURACION * 1000)
+      setArranqueIniciadoEn(Date.now())
       setEstadoComando("pendiente")
       setMensajeComando("Comando enviado. Esperando confirmación del bridge en la Raspberry Pi…")
       comandoPendienteRef.current = true
@@ -379,7 +397,7 @@ export default function RealtimePage() {
             setEstadoComando("enviado")
             setMensajeComando("Comando recibido por el bridge. El péndulo debería configurarse en unos segundos.")
             logBridgeCommandState("enviado", { comandoId, penduloId, atendidoEn: data.atendidoEn })
-            penduloDiag.info("Sistema", `Espera ${SEGUNDOS_CONFIGURACION}s antes de que el péndulo se mueva (cfg → str en Node-RED)`, {
+            penduloDiag.info("Sistema", `Arranque estimado ~${SEGUNDOS_ESPERA_ARRANQUE_TOTAL}s (${SEGUNDOS_CFG_NODE_RED}s cfg + ~${SEGUNDOS_ARRANQUE_HARDWARE}s movimiento)`, {
               comandoId,
             })
             comandoUnsubRef.current?.()
@@ -403,7 +421,7 @@ export default function RealtimePage() {
               posiblesCausas: ["MQTT desconectado en bridge", "Broker Mosquitto caído", "Credenciales MQTT incorrectas"],
             })
             setPracticaEnCurso(false)
-            setConfigurandoHasta(null)
+            setArranqueIniciadoEn(null)
             comandoUnsubRef.current?.()
             comandoUnsubRef.current = null
           }
@@ -421,7 +439,7 @@ export default function RealtimePage() {
             error: err.message,
           })
           setPracticaEnCurso(false)
-          setConfigurandoHasta(null)
+          setArranqueIniciadoEn(null)
         }
       )
 
@@ -443,7 +461,7 @@ export default function RealtimePage() {
       setEstadoComando("error")
       setMensajeComando(err instanceof Error ? err.message : "Error al enviar comando de inicio.")
       setPracticaEnCurso(false)
-      setConfigurandoHasta(null)
+      setArranqueIniciadoEn(null)
     }
   }
 
@@ -454,7 +472,7 @@ export default function RealtimePage() {
       const comandoId = await enviarComando({ usuarioId: user.uid, accion: "detener" })
       logBridgeCommandState("pendiente", { comandoId, accion: "detener", penduloId })
       setPracticaEnCurso(false)
-      setConfigurandoHasta(null)
+      setArranqueIniciadoEn(null)
       penduloDiag.info("Comando", "Práctica finalizada desde la web", { comandoId })
     } catch (err) {
       penduloDiag.error("Comando", 'Error al enviar comando "detener"', {
@@ -591,9 +609,11 @@ export default function RealtimePage() {
                             <li><strong>{distanciaMuro}</strong> cm de distancia del muro</li>
                           </ul>
                           <p>
-                            El péndulo tarda unos {SEGUNDOS_CONFIGURACION} segundos en configurarse
-                            antes de empezar a moverse — no podrás finalizar la práctica hasta que
-                            termine esa configuración inicial.
+                            El péndulo tarda aproximadamente{" "}
+                            <strong>{SEGUNDOS_ESPERA_ARRANQUE_TOTAL} segundos</strong> en estar listo
+                            ({SEGUNDOS_CFG_NODE_RED} s de configuración + ~{SEGUNDOS_ARRANQUE_HARDWARE} s
+                            hasta la primera medición). Verás una cuenta atrás en pantalla — es normal que
+                            no se mueva de inmediato.
                           </p>
                         </div>
                       </AlertDialogDescription>
@@ -620,10 +640,10 @@ export default function RealtimePage() {
               <Button
                 variant="outline"
                 onClick={handleEndPractice}
-                disabled={enviandoComando || !practicaEnCurso || segundosConfigurando > 0}
+                disabled={enviandoComando || !practicaEnCurso || segundosBloqueoFinalizar > 0}
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />
-                Finalizar práctica
+                Finalizar  y reintentar práctica
               </Button>
             </div>
             <div className="flex items-center gap-6 text-sm">
@@ -657,12 +677,15 @@ export default function RealtimePage() {
               {mensajeComando}
             </p>
           )}
-          {segundosConfigurando > 0 && (
-            <p className="text-xs text-primary flex items-center gap-1.5 font-medium">
-              <Clock className="h-3.5 w-3.5" />
-              Configurando péndulo… el movimiento iniciará en {segundosConfigurando}s. "Finalizar
-              práctica" se habilita cuando termine esta cuenta atrás.
-            </p>
+          {mostrarPanelArranque && faseArranque && (
+            <ArranquePracticaPanel
+              fase={faseArranque}
+              segundosRestantes={segundosRestantesTotal}
+              segundosTotal={SEGUNDOS_ESPERA_ARRANQUE_TOTAL}
+              elapsedSeg={elapsedArranqueSeg}
+              segundosCfg={SEGUNDOS_CFG_NODE_RED}
+              estadoDispositivo={estadoDispositivoLabel}
+            />
           )}
           {!puedeIniciar && (
             <p className="text-xs text-amber-600">
@@ -869,6 +892,140 @@ export default function RealtimePage() {
 interface MetricChartPoint {
   muestra: number
   [key: string]: number | null
+}
+
+const FASE_ARRANQUE_INFO: Record<
+  FaseArranque,
+  { titulo: string; descripcion: string; tone: "primary" | "chart-3" | "chart-2" | "amber" }
+> = {
+  configurando: {
+    titulo: "Fase 1 — Configurando mecanismo",
+    descripcion: `Enviando oscilaciones y distancia al péndulo. A los ${SEGUNDOS_CFG_NODE_RED} s se enviará la orden de movimiento — todavía es normal que no se mueva.`,
+    tone: "primary",
+  },
+  arrancando: {
+    titulo: "Fase 2 — Iniciando movimiento",
+    descripcion:
+      "La orden de arranque ya se envió. El péndulo se está posicionando y preparando la primera medición — no canceles, casi listo.",
+    tone: "chart-3",
+  },
+  listo: {
+    titulo: "¡Listo! Práctica en vivo",
+    descripcion: "Llegaron las primeras muestras. Puedes seguir los gráficos y valores en tiempo real.",
+    tone: "chart-2",
+  },
+  demora: {
+    titulo: "Tarda más de lo habitual",
+    descripcion:
+      "Pasó el tiempo estimado sin datos nuevos. La práctica puede estar en curso — revisa la cámara o espera unos segundos más antes de cancelar.",
+    tone: "amber",
+  },
+}
+
+function ArranquePracticaPanel({
+  fase,
+  segundosRestantes,
+  segundosTotal,
+  elapsedSeg,
+  segundosCfg,
+  estadoDispositivo,
+}: {
+  fase: FaseArranque
+  segundosRestantes: number
+  segundosTotal: number
+  elapsedSeg: number
+  segundosCfg: number
+  estadoDispositivo: string | null
+}) {
+  const info = FASE_ARRANQUE_INFO[fase]
+  const progreso = fase === "listo" ? 100 : Math.min(100, Math.round((elapsedSeg / segundosTotal) * 100))
+
+  const pasos = [
+    { id: 1, label: "Configuración", done: elapsedSeg >= segundosCfg || fase === "listo" || fase === "arrancando" || fase === "demora", active: fase === "configurando" },
+    { id: 2, label: "Movimiento", done: fase === "listo" || fase === "demora", active: fase === "arrancando" },
+    { id: 3, label: "En vivo", done: fase === "listo", active: false },
+  ]
+
+  const borderClass =
+    fase === "listo"
+      ? "border-chart-2/60 bg-chart-2/5"
+      : fase === "demora"
+        ? "border-amber-500/50 bg-amber-500/5"
+        : "border-primary/40 bg-primary/5"
+
+  return (
+    <div className={`rounded-xl border p-5 space-y-4 ${borderClass}`}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-foreground">{info.titulo}</p>
+          <p className="text-xs text-muted-foreground max-w-xl">{info.descripcion}</p>
+          {estadoDispositivo && (
+            <p className="text-xs text-primary font-medium">{estadoDispositivo}</p>
+          )}
+        </div>
+
+        {fase === "listo" ? (
+          <div className="flex flex-col items-center justify-center min-w-[120px] py-2">
+            <CheckCircle2 className="h-14 w-14 text-chart-2 animate-pulse" />
+            <span className="text-2xl font-bold text-chart-2 mt-1">¡Listo!</span>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center min-w-[120px]">
+            <span className="text-6xl font-bold font-mono tabular-nums leading-none text-foreground">
+              {segundosRestantes}
+            </span>
+            <span className="text-xs text-muted-foreground mt-2 text-center">
+              seg restantes
+              <br />
+              <span className="text-[10px]">(~{segundosTotal} s en total)</span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className={`h-full transition-all duration-500 rounded-full ${
+              fase === "listo" ? "bg-chart-2" : fase === "demora" ? "bg-amber-500" : "bg-primary"
+            }`}
+            style={{ width: `${progreso}%` }}
+          />
+        </div>
+        <div className="flex justify-between gap-2 text-[11px]">
+          {pasos.map((paso) => (
+            <div
+              key={paso.id}
+              className={`flex items-center gap-1.5 ${
+                paso.done
+                  ? "text-chart-2 font-medium"
+                  : paso.active
+                    ? "text-primary font-medium"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {paso.done ? (
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              ) : paso.active ? (
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+              ) : (
+                <span className="h-3.5 w-3.5 rounded-full border border-muted-foreground/40 shrink-0" />
+              )}
+              <span>{paso.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {fase !== "listo" && (
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+          <Clock className="h-3.5 w-3.5 shrink-0" />
+          Es normal que no veas movimiento durante los primeros {segundosCfg} segundos. No canceles
+          hasta que aparezca &quot;¡Listo!&quot; o pasen ~{segundosTotal} s.
+        </p>
+      )}
+    </div>
+  )
 }
 
 function MetricChart({
