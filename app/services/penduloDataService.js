@@ -2,8 +2,10 @@ import {
   doc,
   collection,
   query,
+  where,
   orderBy,
   limit,
+  getDocs,
   addDoc,
   onSnapshot,
   Timestamp,
@@ -12,12 +14,6 @@ import { db } from './firebase';
 
 /**
  * Escuchar el estado "en vivo" de un péndulo (doc pendulo_data/{penduloId}).
- * Este documento lo escribe el bridge MQTT->Firestore (Admin SDK) cada vez
- * que llega un mensaje del broker.
- * @param {string} penduloId
- * @param {Function} callback - recibe el estado en vivo (o null si no existe aún)
- * @param {Function} [onError]
- * @returns {Function} función para desuscribirse
  */
 export function escucharPenduloEnVivo(penduloId, callback, onError) {
   return onSnapshot(
@@ -28,24 +24,32 @@ export function escucharPenduloEnVivo(penduloId, callback, onError) {
     (error) => {
       console.error('Error al escuchar estado en vivo del péndulo:', error);
       if (onError) onError(error);
-    }
+    },
   );
 }
 
 /**
- * Escuchar las últimas N lecturas históricas de un péndulo, para poblar
- * gráficas (pendulo_data/{penduloId}/lecturas).
- * @param {string} penduloId
- * @param {number} cantidad
- * @param {Function} callback - recibe un array ordenado de más antigua a más reciente
- * @param {Function} [onError]
- * @returns {Function} función para desuscribirse
+ * Escuchar lecturas de la práctica activa del usuario.
+ * Solo trae datos desde practicaInicio en adelante.
  */
-export function escucharLecturasRecientes(penduloId, cantidad, callback, onError) {
+export function escucharLecturasPractica(
+  penduloId,
+  uid,
+  practicaInicio,
+  cantidad,
+  callback,
+  onError,
+) {
+  if (!penduloId || !uid || !practicaInicio) {
+    callback([]);
+    return () => {};
+  }
+
   const q = query(
-    collection(db, 'pendulo_data', penduloId, 'lecturas'),
+    collection(db, 'pendulo_data', penduloId, 'practicas', uid, 'lecturas'),
+    where('timestamp', '>=', practicaInicio),
     orderBy('timestamp', 'desc'),
-    limit(cantidad)
+    limit(cantidad),
   );
 
   return onSnapshot(
@@ -55,36 +59,112 @@ export function escucharLecturasRecientes(penduloId, cantidad, callback, onError
       querySnapshot.forEach((docSnap) => {
         lecturas.push({ id: docSnap.id, ...docSnap.data() });
       });
-      // La query viene descendente (más reciente primero); para graficar
-      // en orden cronológico la invertimos.
       callback(lecturas.reverse());
     },
     (error) => {
-      console.error('Error al escuchar lecturas del péndulo:', error);
+      console.error('Error al escuchar lecturas de práctica:', error);
       if (onError) onError(error);
-    }
+    },
   );
 }
 
 /**
- * @typedef {Object} ComandoPenduloSnapshot
- * @property {string} id
- * @property {'pendiente'|'enviado'|'error'} [estado]
- * @property {string} [errorMsg]
- * @property {import('firebase/firestore').Timestamp} [atendidoEn]
- * @property {string} [penduloId]
- * @property {string} [usuarioId]
- * @property {string} [accion]
+ * Cargar lecturas anteriores a un timestamp (paginación one-shot).
  */
+export async function cargarLecturasAnteriores(
+  penduloId,
+  uid,
+  practicaInicio,
+  cantidad,
+  beforeTimestamp,
+) {
+  if (!penduloId || !uid || !practicaInicio || !beforeTimestamp) {
+    return [];
+  }
+
+  const q = query(
+    collection(db, 'pendulo_data', penduloId, 'practicas', uid, 'lecturas'),
+    where('timestamp', '>=', practicaInicio),
+    where('timestamp', '<', beforeTimestamp),
+    orderBy('timestamp', 'desc'),
+    limit(cantidad),
+  );
+
+  const snapshot = await getDocs(q);
+  const lecturas = [];
+  snapshot.forEach((docSnap) => {
+    lecturas.push({ id: docSnap.id, ...docSnap.data() });
+  });
+
+  return lecturas.reverse();
+}
 
 /**
- * Escuchar el estado de un comando ya creado (pendiente → enviado | error).
- * Útil para confirmar que el bridge en la Raspberry Pi lo procesó.
- * @param {string} comandoId
- * @param {(data: ComandoPenduloSnapshot | null) => void} callback
- * @param {(error: Error) => void} [onError]
- * @returns {() => void} función para desuscribirse
+ * Obtener todas las lecturas de una práctica (para exportación).
  */
+export async function obtenerLecturasPractica(penduloId, uid, practicaId) {
+  let q = query(
+    collection(db, 'pendulo_data', penduloId, 'practicas', uid, 'lecturas'),
+    orderBy('timestamp', 'asc'),
+  );
+
+  if (practicaId) {
+    q = query(
+      collection(db, 'pendulo_data', penduloId, 'practicas', uid, 'lecturas'),
+      where('practicaId', '==', practicaId),
+      orderBy('timestamp', 'asc'),
+    );
+  }
+
+  const snapshot = await getDocs(q);
+  const lecturas = [];
+  snapshot.forEach((docSnap) => {
+    lecturas.push({ id: docSnap.id, ...docSnap.data() });
+  });
+  return lecturas;
+}
+
+/**
+ * Obtener lecturas de un usuario dentro de la franja horaria de una reserva.
+ */
+export async function obtenerLecturasPorSesion(penduloId, uid, inicio, fin) {
+  const q = query(
+    collection(db, 'pendulo_data', penduloId, 'practicas', uid, 'lecturas'),
+    where('timestamp', '>=', inicio),
+    where('timestamp', '<=', fin),
+    orderBy('timestamp', 'asc'),
+  );
+
+  const snapshot = await getDocs(q);
+  const lecturas = [];
+  snapshot.forEach((docSnap) => {
+    lecturas.push({ id: docSnap.id, ...docSnap.data() });
+  });
+  return lecturas;
+}
+
+/**
+ * Listar UIDs con prácticas registradas en un péndulo (para export admin).
+ */
+export async function listarUsuariosConPracticas(penduloId) {
+  const snapshot = await getDocs(collection(db, 'pendulo_data', penduloId, 'practicas'));
+  return snapshot.docs.map((d) => d.id);
+}
+
+/**
+ * @deprecated Usar escucharLecturasPractica. Mantenido por compatibilidad.
+ */
+export function escucharLecturasRecientes(penduloId, cantidad, callback, onError) {
+  return escucharLecturasPractica(
+    penduloId,
+    null,
+    Timestamp.fromMillis(0),
+    cantidad,
+    callback,
+    onError,
+  );
+}
+
 export function escucharEstadoComando(comandoId, callback, onError) {
   return onSnapshot(
     doc(db, 'pendulo_comandos', comandoId),
@@ -94,24 +174,14 @@ export function escucharEstadoComando(comandoId, callback, onError) {
     (error) => {
       console.error('Error al escuchar estado del comando:', error);
       if (onError) onError(error);
-    }
+    },
   );
 }
 
-/**
- * Enviar un comando desde la web hacia el péndulo (el bridge en la
- * Raspberry Pi lo recoge y lo publica por MQTT hacia Node-RED).
- * @param {Object} comando
- * @param {string} comando.penduloId
- * @param {string} comando.usuarioId
- * @param {'configurar'|'iniciar'|'detener'} comando.accion
- * @param {number} [comando.oscilaciones]
- * @param {number} [comando.distanciaMuro]
- * @returns {Promise<string>} ID del documento de comando creado
- */
 export async function enviarComandoPendulo(comando) {
   try {
-    const { penduloId, usuarioId, accion, oscilaciones, distanciaMuro } = comando;
+    const { penduloId, usuarioId, accion, oscilaciones, distanciaMuro, reservacionId, practicaId } =
+      comando;
 
     if (!penduloId) throw new Error('penduloId es requerido');
     if (!usuarioId) throw new Error('usuarioId es requerido');
@@ -127,6 +197,8 @@ export async function enviarComandoPendulo(comando) {
       accion,
       oscilaciones: oscilaciones ?? null,
       distanciaMuro: distanciaMuro ?? null,
+      reservacionId: reservacionId ?? null,
+      practicaId: practicaId ?? null,
       estado: 'pendiente',
       fechaCreacion: Timestamp.now(),
     });

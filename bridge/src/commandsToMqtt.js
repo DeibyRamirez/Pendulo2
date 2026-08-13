@@ -29,7 +29,9 @@ function startCommandsListener(mqttClient) {
 
   const unsubscribe = query.onSnapshot(
     (snapshot) => {
-      if (snapshot.metadata.fromCache) return;
+      // Admin SDK / @google-cloud/firestore no expone snapshot.metadata.fromCache
+      // (eso es del SDK web). Acceder sin optional crashéa el proceso.
+      if (snapshot.metadata?.fromCache) return;
       snapshot.docChanges().forEach((change) => {
         if (change.type !== 'added') return;
         void processComando(mqttClient, change.doc);

@@ -1,7 +1,6 @@
 import {
   doc,
   setDoc,
-  addDoc,
   getDoc,
   collection,
   query,
@@ -11,70 +10,84 @@ import {
   deleteDoc,
   onSnapshot,
   Timestamp,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
 /**
- * Crear una nueva reservación de péndulo
- * @param {Object} reservationData - Datos de la reservación
- * @param {string} reservationData.usuario_id - UID del usuario
- * @param {Date} reservationData.inicio_sesion_reserva - Fecha/hora de inicio
- * @param {Date} reservationData.final_sesion_reserva - Fecha/hora de fin
- * @param {string} reservationData.estado - Estado: pending | active | completed | cancelled
- * @param {string} reservationData.institucion - Institución del usuario
- * @param {string} reservationData.pendulo_id - ID del péndulo
- * @returns {Promise<string>} ID del documento creado
+ * ID determinístico del slot: pendulo + fecha/hora de inicio (30 min fijos).
+ */
+export function buildSlotId(penduloId, inicioDate) {
+  const d = new Date(inicioDate);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${penduloId}_${y}-${m}-${day}_${h}:${min}`;
+}
+
+/**
+ * Crear una nueva reservación con lock atómico de slot.
  */
 export async function crearReservacion(reservationData) {
-  try {
-    const { usuario_id, inicio_sesion_reserva, final_sesion_reserva, estado, institucion, pendulo_id } = reservationData;
+  const { usuario_id, inicio_sesion_reserva, final_sesion_reserva, estado, institucion, pendulo_id } =
+    reservationData;
 
-    // Convertir fechas a Timestamp de Firestore
-    const inicioTimestamp = Timestamp.fromDate(new Date(inicio_sesion_reserva));
-    const finalTimestamp = Timestamp.fromDate(new Date(final_sesion_reserva));
+  const inicioTimestamp = Timestamp.fromDate(new Date(inicio_sesion_reserva));
+  const finalTimestamp = Timestamp.fromDate(new Date(final_sesion_reserva));
 
-    // Validar que la sesión no exceda 30 minutos
-    const duracionMinutos = (finalTimestamp.toDate() - inicioTimestamp.toDate()) / (1000 * 60);
-    if (duracionMinutos > 30) {
-      throw new Error('Las sesiones no pueden exceder 30 minutos');
+  const duracionMinutos = (finalTimestamp.toDate() - inicioTimestamp.toDate()) / (1000 * 60);
+  if (duracionMinutos > 30) {
+    throw new Error('Las sesiones no pueden exceder 30 minutos');
+  }
+
+  const slotId = buildSlotId(pendulo_id, inicioTimestamp.toDate());
+  const slotRef = doc(db, 'slots_ocupados', slotId);
+  const reservacionRef = doc(collection(db, 'reservaciones'));
+
+  await runTransaction(db, async (transaction) => {
+    const slotSnap = await transaction.get(slotRef);
+    if (slotSnap.exists()) {
+      const slotData = slotSnap.data();
+      if (slotData.estado === 'pending' || slotData.estado === 'active') {
+        throw new Error(
+          'Este horario ya está ocupado. Por favor selecciona otro slot disponible.',
+        );
+      }
     }
 
-    // Crear documento en la colección 'reservaciones'
-    const docRef = await addDoc(collection(db, 'reservaciones'), {
+    transaction.set(slotRef, {
+      pendulo_id,
+      inicio: inicioTimestamp,
+      fin: finalTimestamp,
+      estado: 'pending',
+      reservacion_id: reservacionRef.id,
+    });
+
+    transaction.set(reservacionRef, {
       usuario_id,
       inicio_sesion_reserva: inicioTimestamp,
       final_sesion_reserva: finalTimestamp,
       estado: estado || 'pending',
       institucion,
       pendulo_id,
+      slot_id: slotId,
       fecha_creacion: Timestamp.now(),
     });
+  });
 
-    return docRef.id;
-  } catch (error) {
-    console.error('Error al crear reservación:', error);
-    throw error;
-  }
+  return reservacionRef.id;
 }
 
-/**
- * Obtener todas las reservaciones de un usuario
- * @param {string} usuario_id - UID del usuario
- * @returns {Promise<Array>} Lista de reservaciones del usuario
- */
 export async function obtenerReservacionesPorUsuario(usuario_id) {
   try {
     const q = query(collection(db, 'reservaciones'), where('usuario_id', '==', usuario_id));
     const querySnapshot = await getDocs(q);
     const reservaciones = [];
-
-    querySnapshot.forEach((doc) => {
-      reservaciones.push({
-        id: doc.id,
-        ...doc.data(),
-      });
+    querySnapshot.forEach((docSnap) => {
+      reservaciones.push({ id: docSnap.id, ...docSnap.data() });
     });
-
     return reservaciones;
   } catch (error) {
     console.error('Error al obtener reservaciones del usuario:', error);
@@ -82,24 +95,14 @@ export async function obtenerReservacionesPorUsuario(usuario_id) {
   }
 }
 
-/**
- * Obtener todas las reservaciones de un péndulo
- * @param {string} pendulo_id - ID del péndulo
- * @returns {Promise<Array>} Lista de reservaciones del péndulo
- */
 export async function obtenerReservacionesPorPendulo(pendulo_id) {
   try {
     const q = query(collection(db, 'reservaciones'), where('pendulo_id', '==', pendulo_id));
     const querySnapshot = await getDocs(q);
     const reservaciones = [];
-
-    querySnapshot.forEach((doc) => {
-      reservaciones.push({
-        id: doc.id,
-        ...doc.data(),
-      });
+    querySnapshot.forEach((docSnap) => {
+      reservaciones.push({ id: docSnap.id, ...docSnap.data() });
     });
-
     return reservaciones;
   } catch (error) {
     console.error('Error al obtener reservaciones del péndulo:', error);
@@ -107,24 +110,14 @@ export async function obtenerReservacionesPorPendulo(pendulo_id) {
   }
 }
 
-/**
- * Obtener todas las reservaciones de una institución
- * @param {string} institucion - Nombre de la institución
- * @returns {Promise<Array>} Lista de reservaciones de la institución
- */
 export async function obtenerReservacionesPorInstitucion(institucion) {
   try {
     const q = query(collection(db, 'reservaciones'), where('institucion', '==', institucion));
     const querySnapshot = await getDocs(q);
     const reservaciones = [];
-
-    querySnapshot.forEach((doc) => {
-      reservaciones.push({
-        id: doc.id,
-        ...doc.data(),
-      });
+    querySnapshot.forEach((docSnap) => {
+      reservaciones.push({ id: docSnap.id, ...docSnap.data() });
     });
-
     return reservaciones;
   } catch (error) {
     console.error('Error al obtener reservaciones de la institución:', error);
@@ -132,12 +125,6 @@ export async function obtenerReservacionesPorInstitucion(institucion) {
   }
 }
 
-/**
- * Actualizar el estado de una reservación
- * @param {string} reservacion_id - ID del documento de reservación
- * @param {string} nuevoEstado - Nuevo estado (pending | active | completed | cancelled)
- * @returns {Promise<void>}
- */
 export async function actualizarEstadoReservacion(reservacion_id, nuevoEstado) {
   try {
     const validStates = ['pending', 'active', 'completed', 'cancelled'];
@@ -155,25 +142,33 @@ export async function actualizarEstadoReservacion(reservacion_id, nuevoEstado) {
   }
 }
 
-/**
- * Cancelar una reservación
- * @param {string} reservacion_id - ID del documento de reservación
- * @returns {Promise<void>}
- */
 export async function cancelarReservacion(reservacion_id) {
   try {
-    await actualizarEstadoReservacion(reservacion_id, 'cancelled');
+    const reservacionRef = doc(db, 'reservaciones', reservacion_id);
+    const reservacionSnap = await getDoc(reservacionRef);
+    if (!reservacionSnap.exists()) {
+      throw new Error('Reservación no encontrada');
+    }
+
+    const reservacion = reservacionSnap.data();
+    await updateDoc(reservacionRef, {
+      estado: 'cancelled',
+      fecha_actualizacion: Timestamp.now(),
+    });
+
+    if (reservacion.slot_id) {
+      const slotRef = doc(db, 'slots_ocupados', reservacion.slot_id);
+      const slotSnap = await getDoc(slotRef);
+      if (slotSnap.exists()) {
+        await updateDoc(slotRef, { estado: 'cancelled' });
+      }
+    }
   } catch (error) {
     console.error('Error al cancelar reservación:', error);
     throw error;
   }
 }
 
-/**
- * Eliminar una reservación (solo si está en estado pending)
- * @param {string} reservacion_id - ID del documento de reservación
- * @returns {Promise<void>}
- */
 export async function eliminarReservacion(reservacion_id) {
   try {
     const docRef = doc(db, 'reservaciones', reservacion_id);
@@ -195,33 +190,27 @@ export async function eliminarReservacion(reservacion_id) {
   }
 }
 
-/**
- * Validar que no haya conflictos de horarios para un péndulo
- * @param {string} pendulo_id - ID del péndulo
- * @param {Timestamp} inicio - Timestamp de inicio
- * @param {Timestamp} final - Timestamp de fin
- * @returns {Promise<boolean>} true si no hay conflictos
- */
 export async function validarConflictosHorario(pendulo_id, inicio, final) {
   try {
     const q = query(
       collection(db, 'reservaciones'),
       where('pendulo_id', '==', pendulo_id),
-      where('estado', 'in', ['pending', 'active'])
+      where('estado', 'in', ['pending', 'active']),
     );
 
     const querySnapshot = await getDocs(q);
 
-    for (const doc of querySnapshot.docs) {
-      const reservacion = doc.data();
+    for (const docSnap of querySnapshot.docs) {
+      const reservacion = docSnap.data();
       const existingStart = reservacion.inicio_sesion_reserva.toDate();
       const existingEnd = reservacion.final_sesion_reserva.toDate();
       const newStart = inicio.toDate();
       const newEnd = final.toDate();
 
-      // Verificar si hay solapamiento
       if (newStart < existingEnd && newEnd > existingStart) {
-        throw new Error(`Hay un conflicto de horario. El péndulo está reservado desde ${existingStart.toLocaleString()} hasta ${existingEnd.toLocaleString()}`);
+        throw new Error(
+          `Hay un conflicto de horario. El péndulo está reservado desde ${existingStart.toLocaleString()} hasta ${existingEnd.toLocaleString()}`,
+        );
       }
     }
 
@@ -233,50 +222,214 @@ export async function validarConflictosHorario(pendulo_id, inicio, final) {
 }
 
 /**
- * Escuchar cambios en tiempo real de las reservaciones de un usuario
- * @param {string} usuario_id - UID del usuario
- * @param {Function} callback - Función a ejecutar cuando hay cambios
- * @returns {Function} Función para desuscribirse
+ * Inicia práctica: lock exclusivo del péndulo + sesión activa en Firestore.
  */
-export function escucharReservacionesUsuario(usuario_id, callback, onError) {
-  const q = query(collection(db, 'reservaciones'), where('usuario_id', '==', usuario_id));
-  
-  return onSnapshot(q, (querySnapshot) => {
-    const reservaciones = [];
-    querySnapshot.forEach((doc) => {
-      reservaciones.push({
-        id: doc.id,
-        ...doc.data(),
-      });
+export async function iniciarPractica({ reservacionId, penduloId, usuarioId }) {
+  const practicaId = `${usuarioId}_${Date.now()}`;
+  const practicaInicio = Timestamp.now();
+  const penduloRef = doc(db, 'pendulo_data', penduloId);
+  const reservacionRef = doc(db, 'reservaciones', reservacionId);
+
+  await runTransaction(db, async (transaction) => {
+    const reservacionSnap = await transaction.get(reservacionRef);
+    if (!reservacionSnap.exists()) {
+      throw new Error('Reservación no encontrada');
+    }
+
+    const reservacion = reservacionSnap.data();
+    if (reservacion.usuario_id !== usuarioId) {
+      throw new Error('No tienes permiso para iniciar esta reservación');
+    }
+
+    const ahora = Timestamp.now();
+    if (ahora.toMillis() < reservacion.inicio_sesion_reserva.toMillis()) {
+      throw new Error('Aún no es tu horario de reserva');
+    }
+    if (ahora.toMillis() > reservacion.final_sesion_reserva.toMillis()) {
+      throw new Error('Tu franja de reserva ya expiró');
+    }
+
+    const penduloSnap = await transaction.get(penduloRef);
+    const penduloData = penduloSnap.exists() ? penduloSnap.data() : {};
+    if (
+      penduloData.usuarioActivo &&
+      penduloData.usuarioActivo !== usuarioId
+    ) {
+      throw new Error('Otro estudiante tiene el control del péndulo en este momento');
+    }
+
+    transaction.update(reservacionRef, {
+      estado: 'active',
+      practica_id: practicaId,
+      fecha_actualizacion: Timestamp.now(),
     });
-    callback(reservaciones);
-  }, (error) => {
-    console.error('Error al escuchar reservaciones:', error);
-    if (onError) onError(error);
+
+    transaction.set(
+      penduloRef,
+      {
+        usuarioActivo: usuarioId,
+        practicaId,
+        practicaInicio,
+        penduloId,
+      },
+      { merge: true },
+    );
+
+    if (reservacion.slot_id) {
+      const slotRef = doc(db, 'slots_ocupados', reservacion.slot_id);
+      transaction.update(slotRef, { estado: 'active' });
+    }
+  });
+
+  return { practicaId, practicaInicio };
+}
+
+/**
+ * Libera el péndulo tras una práctica individual sin cerrar la reserva.
+ * El estudiante puede iniciar otra práctica mientras siga en su franja de 30 min.
+ */
+export async function liberarPractica({ reservacionId, penduloId, usuarioId }) {
+  const penduloRef = doc(db, 'pendulo_data', penduloId);
+  const reservacionRef = doc(db, 'reservaciones', reservacionId);
+
+  await runTransaction(db, async (transaction) => {
+    const reservacionSnap = await transaction.get(reservacionRef);
+    if (!reservacionSnap.exists()) {
+      throw new Error('Reservación no encontrada');
+    }
+
+    const reservacion = reservacionSnap.data();
+    if (reservacion.usuario_id !== usuarioId) {
+      throw new Error('No tienes permiso para liberar esta práctica');
+    }
+
+    const practicasRealizadas = (reservacion.practicas_realizadas ?? 0) + 1;
+
+    transaction.update(reservacionRef, {
+      estado: 'active',
+      practicas_realizadas: practicasRealizadas,
+      fecha_actualizacion: Timestamp.now(),
+    });
+
+    transaction.set(
+      penduloRef,
+      {
+        usuarioActivo: null,
+        practicaId: null,
+        practicaInicio: null,
+      },
+      { merge: true },
+    );
   });
 }
 
 /**
- * Escuchar cambios en tiempo real de todas las reservaciones
- * @param {Function} callback - Funcion a ejecutar cuando hay cambios
- * @returns {Function} Funcion para desuscribirse
+ * Cierra la reserva completa (fin de la franja de 30 min o cierre manual).
  */
+export async function completarReservacion({ reservacionId, penduloId, usuarioId }) {
+  const penduloRef = doc(db, 'pendulo_data', penduloId);
+  const reservacionRef = doc(db, 'reservaciones', reservacionId);
+
+  await runTransaction(db, async (transaction) => {
+    const reservacionSnap = await transaction.get(reservacionRef);
+    if (!reservacionSnap.exists()) {
+      throw new Error('Reservación no encontrada');
+    }
+
+    const reservacion = reservacionSnap.data();
+    if (reservacion.usuario_id !== usuarioId) {
+      throw new Error('No tienes permiso para completar esta reservación');
+    }
+
+    transaction.update(reservacionRef, {
+      estado: 'completed',
+      fecha_actualizacion: Timestamp.now(),
+    });
+
+    const penduloSnap = await transaction.get(penduloRef);
+    const penduloData = penduloSnap.exists() ? penduloSnap.data() : {};
+    if (!penduloData.usuarioActivo || penduloData.usuarioActivo === usuarioId) {
+      transaction.set(
+        penduloRef,
+        {
+          usuarioActivo: null,
+          practicaId: null,
+          practicaInicio: null,
+        },
+        { merge: true },
+      );
+    }
+
+    if (reservacion.slot_id) {
+      const slotRef = doc(db, 'slots_ocupados', reservacion.slot_id);
+      transaction.update(slotRef, { estado: 'cancelled' });
+    }
+  });
+}
+
+/** @deprecated Usar liberarPractica o completarReservacion según el caso. */
+export async function finalizarPractica(params) {
+  return liberarPractica(params);
+}
+
+export function escucharReservacionesUsuario(usuario_id, callback, onError) {
+  const q = query(collection(db, 'reservaciones'), where('usuario_id', '==', usuario_id));
+
+  return onSnapshot(
+    q,
+    (querySnapshot) => {
+      const reservaciones = [];
+      querySnapshot.forEach((docSnap) => {
+        reservaciones.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      callback(reservaciones);
+    },
+    (error) => {
+      console.error('Error al escuchar reservaciones:', error);
+      if (onError) onError(error);
+    },
+  );
+}
+
 export function escucharTodasReservaciones(callback, onError) {
   return onSnapshot(
     collection(db, 'reservaciones'),
     (querySnapshot) => {
       const reservaciones = [];
-      querySnapshot.forEach((doc) => {
-        reservaciones.push({
-          id: doc.id,
-          ...doc.data(),
-        });
+      querySnapshot.forEach((docSnap) => {
+        reservaciones.push({ id: docSnap.id, ...docSnap.data() });
       });
       callback(reservaciones);
     },
     (error) => {
       console.error('Error al escuchar todas las reservaciones:', error);
       if (onError) onError(error);
-    }
+    },
+  );
+}
+
+/**
+ * Escuchar slots ocupados de un péndulo (disponibilidad pública sin PII).
+ */
+export function escucharSlotsOcupados(pendulo_id, callback, onError) {
+  const q = query(
+    collection(db, 'slots_ocupados'),
+    where('pendulo_id', '==', pendulo_id),
+    where('estado', 'in', ['pending', 'active']),
+  );
+
+  return onSnapshot(
+    q,
+    (querySnapshot) => {
+      const slots = [];
+      querySnapshot.forEach((docSnap) => {
+        slots.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      callback(slots);
+    },
+    (error) => {
+      console.error('Error al escuchar slots ocupados:', error);
+      if (onError) onError(error);
+    },
   );
 }

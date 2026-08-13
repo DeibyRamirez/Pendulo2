@@ -49,12 +49,32 @@ async function handleMessage(topic, message) {
   // "END" es solo una señal de estado, no un dato de medición.
   if (!isEndSignal && isSample && shouldWriteLectura(penduloId)) {
     try {
-      await liveDocRef.collection('lecturas').add({
+      const liveSnap = await liveDocRef.get();
+      const liveData = liveSnap.exists ? liveSnap.data() : {};
+      const usuarioActivo = liveData.usuarioActivo;
+      const practicaId = liveData.practicaId;
+
+      if (!usuarioActivo) {
+        logger.warn(
+          `Omitiendo lectura historica de ${penduloId}: sin usuarioActivo (practica no iniciada desde la web).`,
+        );
+        return;
+      }
+
+      const lecturaPayload = {
         ...fields,
+        penduloId,
+        practicaId: practicaId || null,
         topico: topic,
         raw,
         timestamp: now,
-      });
+      };
+
+      await liveDocRef
+        .collection('practicas')
+        .doc(usuarioActivo)
+        .collection('lecturas')
+        .add(lecturaPayload);
     } catch (err) {
       logger.error(`Error escribiendo lectura historica de ${penduloId}:`, err.message);
     }
@@ -80,9 +100,6 @@ function startMqttToFirestoreBridge() {
         logger.error(`No se pudo suscribir a ${config.mqtt.subscribeTopic}:`, err.message);
         return;
       }
-      // El broker puede "aceptar" la suscripcion a nivel de red pero
-      // denegarla por ACL devolviendo qos 128 en el SUBACK; mqtt.js no
-      // siempre lo reporta como `err`, hay que revisar `granted` a mano.
       const denegado = (granted || []).filter((g) => g.qos >= 128);
       if (denegado.length > 0) {
         logger.error(

@@ -14,7 +14,6 @@ import {
   CheckCircle,
   XCircle,
   Info,
-  FileSpreadsheet,
   Loader2,
   AlertCircle,
 } from "lucide-react"
@@ -24,6 +23,7 @@ import {
   cancelarReservacion,
   escucharTodasReservaciones,
   escucharReservacionesUsuario,
+  escucharSlotsOcupados,
 } from "@/app/services/reservacionService"
 import { escucharUsuarios } from "@/app/services/usuarioService"
 import type { Timestamp } from "firebase/firestore"
@@ -37,6 +37,7 @@ const TIME_SLOTS = [
   "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
   "11:00", "11:30", "12:00", "12:30", "14:00", "14:30",
   "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
+  //"18:00", "18:30", "19:00", "19:30", "20:00", "20:30"
 ]
 const PENDULO_ID = "UAC-01"
 
@@ -55,11 +56,34 @@ interface UsuarioLite {
   nombre?: string
 }
 
+interface SlotOcupado {
+  id: string
+  pendulo_id: string
+  inicio: Timestamp
+  fin: Timestamp
+  estado: "pending" | "active" | "cancelled"
+}
+
 function toDate(value: Timestamp | Date): Date {
   if (value instanceof Date) return value
   return value?.toDate?.() ?? new Date()
 }
 
+function buildBookedSlotsFromSlots(slots: SlotOcupado[]): Record<string, string[]> {
+  const result: Record<string, string[]> = {}
+  slots.forEach((s) => {
+    const inicio = toDate(s.inicio)
+    const key = `${inicio.getFullYear()}-${inicio.getMonth() + 1}-${inicio.getDate()}`
+    const timeStr = inicio.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+    if (!result[key]) result[key] = []
+    if (!result[key].includes(timeStr)) result[key].push(timeStr)
+  })
+  return result
+}
 function buildBookedSlots(reservaciones: Reservacion[]): Record<string, string[]> {
   const slots: Record<string, string[]> = {}
   reservaciones
@@ -80,6 +104,7 @@ function buildBookedSlots(reservaciones: Reservacion[]): Record<string, string[]
 
 function buildBookedSlotOwners(
   reservaciones: Reservacion[],
+  slotsOcupados: SlotOcupado[],
   currentUserId?: string
 ): Record<string, Record<string, "mine" | "occupied">> {
   const slots: Record<string, Record<string, "mine" | "occupied">> = {}
@@ -99,6 +124,20 @@ function buildBookedSlotOwners(
       slots[key][timeStr] = r.usuario_id === currentUserId ? "mine" : "occupied"
     })
 
+  slotsOcupados.forEach((s) => {
+    const inicio = toDate(s.inicio)
+    const key = `${inicio.getFullYear()}-${inicio.getMonth() + 1}-${inicio.getDate()}`
+    const timeStr = inicio.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+    if (!slots[key]) slots[key] = {}
+    if (!slots[key][timeStr]) {
+      slots[key][timeStr] = "occupied"
+    }
+  })
+
   return slots
 }
 
@@ -113,6 +152,7 @@ export default function ReservasPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reservaciones, setReservaciones] = useState<Reservacion[]>([])
+  const [slotsOcupados, setSlotsOcupados] = useState<SlotOcupado[]>([])
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [usuariosMap, setUsuariosMap] = useState<Record<string, UsuarioLite>>({})
 
@@ -146,6 +186,17 @@ export default function ReservasPage() {
   }, [user?.uid, esDocenteOAdmin])
 
   useEffect(() => {
+    if (!user?.uid) return
+
+    const unsub = escucharSlotsOcupados(
+      PENDULO_ID,
+      (data: SlotOcupado[]) => setSlotsOcupados(data),
+      (err: Error) => console.error("Error escuchando slots ocupados:", err)
+    )
+    return () => unsub()
+  }, [user?.uid])
+
+  useEffect(() => {
     if (!esDocenteOAdmin) return
 
     const unsub = (escucharUsuarios as unknown as (callback: (data: UsuarioLite[]) => void) => () => void)((data) => {
@@ -159,8 +210,14 @@ export default function ReservasPage() {
     return () => unsub()
   }, [esDocenteOAdmin])
 
-  const bookedSlots = buildBookedSlots(reservaciones)
-  const bookedSlotOwners = buildBookedSlotOwners(reservaciones, user?.uid)
+  const bookedSlots = esDocenteOAdmin
+    ? buildBookedSlots(reservaciones)
+    : buildBookedSlotsFromSlots(slotsOcupados)
+  const bookedSlotOwners = buildBookedSlotOwners(
+    reservaciones.filter((r) => r.usuario_id === user?.uid),
+    slotsOcupados,
+    user?.uid
+  )
 
   const getDaysInMonth = (date: Date) => ({
     firstDay: new Date(date.getFullYear(), date.getMonth(), 1).getDay(),
@@ -252,51 +309,6 @@ export default function ReservasPage() {
     }
   }
 
-  const exportToCSV = () => {
-    const activas = reservaciones
-      .filter((r) => r.estado === "pending" || r.estado === "active")
-      .filter((r) => (esDocenteOAdmin ? true : r.usuario_id === user?.uid))
-    if (activas.length === 0) {
-      alert("No hay reservaciones activas para exportar")
-      return
-    }
-    const headers = esDocenteOAdmin
-      ? ["Usuario", "Institución", "Fecha", "Hora", "Duración(min)", "Péndulo", "Estado"]
-      : ["Fecha Inicio", "Fecha Fin", "Péndulo", "Institución", "Estado"]
-    const rows = activas.map((r) => {
-      if (esDocenteOAdmin) {
-        const inicio = toDate(r.inicio_sesion_reserva)
-        const fin = toDate(r.final_sesion_reserva)
-        const duracion = Math.round((fin.getTime() - inicio.getTime()) / 60000)
-        return [
-          usuariosMap[r.usuario_id]?.nombre || r.usuario_id,
-          r.institucion,
-          inicio.toLocaleDateString("es-ES"),
-          inicio.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: false }),
-          String(duracion),
-          r.pendulo_id,
-          r.estado,
-        ]
-      }
-      return [
-        toDate(r.inicio_sesion_reserva).toLocaleString("es-ES"),
-        toDate(r.final_sesion_reserva).toLocaleString("es-ES"),
-        r.pendulo_id,
-        r.institucion,
-        r.estado,
-      ]
-    })
-    const csv = [
-      headers.join(","),
-      ...rows.map((row) => row.map((c) => `"${c}"`).join(",")),
-    ].join("\n")
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-    link.href = URL.createObjectURL(blob)
-    link.download = `reservas_pendulo_${new Date().toISOString().split("T")[0]}.csv`
-    link.click()
-  }
-
   const misReservasActivas = reservaciones
     .filter((r) => r.estado === "pending" || r.estado === "active")
     .sort(
@@ -315,21 +327,15 @@ export default function ReservasPage() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
 
           {/* Header */}
-          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                {esDocenteOAdmin ? "Gestión de Reservas" : "Reservar Sesión"}
-              </h1>
-              <p className="text-muted-foreground mt-2">
-                {esDocenteOAdmin
-                  ? "Visualiza todas las reservas del sistema y agenda nuevas sesiones"
-                  : "Selecciona una fecha y hora para tu sesión experimental con el péndulo físico"}
-              </p>
-            </div>
-            <Button variant="outline" onClick={exportToCSV} className="self-start">
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Exportar CSV
-            </Button>
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-foreground">
+              {esDocenteOAdmin ? "Gestión de Reservas" : "Reservar Sesión"}
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              {esDocenteOAdmin
+                ? "Visualiza todas las reservas del sistema y agenda nuevas sesiones"
+                : "Selecciona una fecha y hora para tu sesión experimental con el péndulo físico"}
+            </p>
           </div>
 
           {/* Error global */}

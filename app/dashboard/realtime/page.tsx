@@ -28,7 +28,7 @@ import {
   AlertTriangle,
   Clock,
 } from "lucide-react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, type UIEvent } from "react"
 import {
   LineChart,
   Line,
@@ -40,9 +40,10 @@ import {
 } from "recharts"
 import { CameraStream } from "@/components/camera-stream"
 import { useAuth } from "@/hooks/useAuth"
-import { usePenduloData } from "@/hooks/usePenduloData"
-import { escucharReservacionesUsuario } from "@/app/services/reservacionService"
-import { escucharEstadoComando } from "@/app/services/penduloDataService"
+import { usePenduloData, type LecturaPendulo } from "@/hooks/usePenduloData"
+import { escucharReservacionesUsuario, iniciarPractica, liberarPractica, completarReservacion } from "@/app/services/reservacionService"
+import { escucharEstadoComando, cargarLecturasAnteriores } from "@/app/services/penduloDataService"
+import { exportarLecturasUsuario, exportarLecturasAdmin } from "@/app/services/lecturasExportService"
 import type { Timestamp } from "firebase/firestore"
 import {
   checkFirebaseEnv,
@@ -64,7 +65,7 @@ const SEGUNDOS_SIN_SENAL = 10
 const OSCILACIONES_MIN = 1
 const OSCILACIONES_MAX = 20
 const DISTANCIA_MURO_MIN = 1
-const DISTANCIA_MURO_MAX = 15
+const DISTANCIA_MURO_MAX = 20
 
 // Node-RED: cfg → espera → str (bridge/node-red-command-flow.json).
 const SEGUNDOS_CFG_NODE_RED = 15
@@ -115,7 +116,7 @@ function toMillis(ts: Timestamp | undefined): number | null {
 }
 
 export default function RealtimePage() {
-  const { user } = useAuth()
+  const { user, rol } = useAuth()
   const [mounted, setMounted] = useState(false)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [estadoComando, setEstadoComando] = useState<EstadoComandoUi>(null)
@@ -125,12 +126,19 @@ export default function RealtimePage() {
   const comandoTimeoutRef = useRef<number | null>(null)
   const signalStateRef = useRef<SignalState | null>(null)
   const reservaLoggedRef = useRef<boolean | null>(null)
+  const finalizadoRef = useRef(false)
   const sessionStartedRef = useRef(false)
   const estadoDispositivoPrevRef = useRef<string | null>(null)
   const [reservaciones, setReservaciones] = useState<Reservacion[]>([])
-  const [oscilaciones, setOscilaciones] = useState(5)
-  const [distanciaMuro, setDistanciaMuro] = useState(5)
+  const [oscilaciones, setOscilaciones] = useState(10)
+  const [distanciaMuro, setDistanciaMuro] = useState(10)
   const [practicaEnCurso, setPracticaEnCurso] = useState(false)
+  const [practicaId, setPracticaId] = useState<string | null>(null)
+  const [practicaInicio, setPracticaInicio] = useState<Timestamp | null>(null)
+  const [lecturasAnteriores, setLecturasAnteriores] = useState<LecturaPendulo[]>([])
+  const [cargandoMasLecturas, setCargandoMasLecturas] = useState(false)
+  const [hayMasLecturas, setHayMasLecturas] = useState(true)
+  const [exportando, setExportando] = useState(false)
   const [arranqueIniciadoEn, setArranqueIniciadoEn] = useState<number | null>(null)
   const [nowTick, setNowTick] = useState(() => Date.now())
 
@@ -174,10 +182,12 @@ export default function RealtimePage() {
 
   const ahora = new Date()
   const reservaEnTurno = reservaciones.find((r) => {
-    if (r.estado !== "pending" && r.estado !== "active") return false
+    if (r.estado === "cancelled") return false
     const inicio = toDate(r.inicio_sesion_reserva)
     const fin = toDate(r.final_sesion_reserva)
-    return ahora >= inicio && ahora <= fin
+    const enVentana = ahora >= inicio && ahora <= fin
+    if (!enVentana) return false
+    return r.estado === "pending" || r.estado === "active" || r.estado === "completed"
   })
   const puedeIniciar = !!reservaEnTurno
   const penduloId = reservaEnTurno?.pendulo_id || DEFAULT_PENDULO_ID
@@ -189,7 +199,11 @@ export default function RealtimePage() {
     enviarComando,
     enviandoComando,
     error: errorPendulo,
-  } = usePenduloData(penduloId)
+  } = usePenduloData(penduloId, {
+    cantidadLecturas: 10,
+    uid: practicaEnCurso ? user?.uid ?? null : null,
+    practicaInicio: practicaEnCurso ? practicaInicio : null,
+  })
 
   const practicaFinalizada = enVivo?.estado === "finalizado"
   const practicaConError = enVivo?.estado === "error"
@@ -243,13 +257,59 @@ export default function RealtimePage() {
     ? ESTADO_DISPOSITIVO_LABEL[enVivo.estadoDispositivo] ?? null
     : null
 
-  // Limpia el panel de arranque cuando termina la práctica.
+  // Limpia el panel de arranque y libera el péndulo cuando termina una práctica
+  // (la reserva sigue activa hasta que expiren los 30 min).
   useEffect(() => {
     if (enVivo?.estado === "finalizado" || enVivo?.estado === "error") {
       setPracticaEnCurso(false)
       setArranqueIniciadoEn(null)
+
+      if (
+        enVivo?.estado === "finalizado" &&
+        reservaEnTurno &&
+        user?.uid &&
+        practicaId &&
+        !finalizadoRef.current
+      ) {
+        finalizadoRef.current = true
+        void liberarPractica({
+          reservacionId: reservaEnTurno.id,
+          penduloId,
+          usuarioId: user.uid,
+        }).catch((err) => {
+          penduloDiag.error("Reserva", "Error al liberar práctica", {
+            error: err instanceof Error ? err.message : String(err),
+          })
+        })
+      }
     }
-  }, [enVivo?.estado])
+  }, [enVivo?.estado, reservaEnTurno, user?.uid, practicaId, penduloId])
+
+  // Al expirar la franja de 30 min, cerrar la reservación automáticamente.
+  useEffect(() => {
+    if (!reservaEnTurno || !user?.uid) return
+
+    const fin = toDate(reservaEnTurno.final_sesion_reserva).getTime()
+    const msRestantes = fin - Date.now()
+    if (msRestantes <= 0) {
+      void completarReservacion({
+        reservacionId: reservaEnTurno.id,
+        penduloId,
+        usuarioId: user.uid,
+      })
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      void completarReservacion({
+        reservacionId: reservaEnTurno.id,
+        penduloId,
+        usuarioId: user.uid,
+      })
+    }, msRestantes)
+
+    return () => window.clearTimeout(timer)
+  }, [reservaEnTurno, user?.uid, penduloId])
 
   const parametrosValidos =
     oscilaciones >= OSCILACIONES_MIN &&
@@ -351,7 +411,7 @@ export default function RealtimePage() {
   }, [enVivo?.estadoDispositivo, enVivo?.oscilacionesConfirmadas, enVivo?.distanciaMuroConfirmada, penduloId])
 
   const handleStartPractice = async () => {
-    if (!puedeIniciar || !user?.uid || !parametrosValidos || practicaEnCurso) {
+    if (!puedeIniciar || !user?.uid || !parametrosValidos || practicaEnCurso || !reservaEnTurno) {
       penduloDiag.warn("Comando", "Inicio de práctica bloqueado", {
         puedeIniciar,
         usuario: user?.uid ?? null,
@@ -365,17 +425,30 @@ export default function RealtimePage() {
     setConfirmDialogOpen(false)
     setEstadoComando(null)
     setMensajeComando(null)
+    setLecturasAnteriores([])
+    setHayMasLecturas(true)
     comandoUnsubRef.current?.()
     if (comandoTimeoutRef.current !== null) {
       window.clearTimeout(comandoTimeoutRef.current)
       comandoTimeoutRef.current = null
     }
     try {
+      const { practicaId: nuevaPracticaId, practicaInicio: inicioPractica } = await iniciarPractica({
+        reservacionId: reservaEnTurno.id,
+        penduloId,
+        usuarioId: user.uid,
+      })
+      setPracticaId(nuevaPracticaId)
+      setPracticaInicio(inicioPractica)
+      finalizadoRef.current = false
+
       const comandoId = await enviarComando({
         usuarioId: user.uid,
         accion: "iniciar",
         oscilaciones,
         distanciaMuro,
+        reservacionId: reservaEnTurno.id,
+        practicaId: nuevaPracticaId,
       })
       setPracticaEnCurso(true)
       setArranqueIniciadoEn(Date.now())
@@ -466,14 +539,25 @@ export default function RealtimePage() {
   }
 
   const handleEndPractice = async () => {
-    if (!user?.uid) return
+    if (!user?.uid || !reservaEnTurno) return
     penduloDiag.info("Comando", 'Enviando comando "detener"', { penduloId, usuarioId: user.uid })
     try {
-      const comandoId = await enviarComando({ usuarioId: user.uid, accion: "detener" })
+      const comandoId = await enviarComando({
+        usuarioId: user.uid,
+        accion: "detener",
+        reservacionId: reservaEnTurno.id,
+        practicaId: practicaId ?? undefined,
+      })
       logBridgeCommandState("pendiente", { comandoId, accion: "detener", penduloId })
       setPracticaEnCurso(false)
       setArranqueIniciadoEn(null)
-      penduloDiag.info("Comando", "Práctica finalizada desde la web", { comandoId })
+      await liberarPractica({
+        reservacionId: reservaEnTurno.id,
+        penduloId,
+        usuarioId: user.uid,
+      })
+      finalizadoRef.current = true
+      penduloDiag.info("Comando", "Práctica detenida; puedes iniciar otra mientras dure tu reserva", { comandoId })
     } catch (err) {
       penduloDiag.error("Comando", 'Error al enviar comando "detener"', {
         error: err instanceof Error ? err.message : String(err),
@@ -481,6 +565,68 @@ export default function RealtimePage() {
       })
     }
   }
+
+  const handleExportar = async () => {
+    if (!user?.uid) return
+    setExportando(true)
+    try {
+      if (rol === "Admin") {
+        await exportarLecturasAdmin(penduloId)
+      } else {
+        if (!practicaId) {
+          alert("No hay una práctica activa o reciente para exportar")
+          return
+        }
+        await exportarLecturasUsuario(penduloId, user.uid, practicaId)
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Error al exportar datos")
+    } finally {
+      setExportando(false)
+    }
+  }
+
+  const handleCargarMasLecturas = async () => {
+    if (!user?.uid || !practicaInicio || cargandoMasLecturas || !hayMasLecturas) return
+
+    const todas = [...lecturasAnteriores, ...lecturas]
+    const masAntigua = todas[0]
+    if (!masAntigua?.timestamp) return
+
+    setCargandoMasLecturas(true)
+    try {
+      const anteriores = await cargarLecturasAnteriores(
+        penduloId,
+        user.uid,
+        practicaInicio,
+        10,
+        masAntigua.timestamp,
+      )
+      if (anteriores.length < 10) {
+        setHayMasLecturas(false)
+      }
+      if (anteriores.length > 0) {
+        setLecturasAnteriores((prev) => [...anteriores, ...prev])
+      } else {
+        setHayMasLecturas(false)
+      }
+    } catch (err) {
+      penduloDiag.error("Firestore", "Error cargando lecturas anteriores", {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setCargandoMasLecturas(false)
+    }
+  }
+
+  const handleTablaScroll = (e: UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 20) {
+      void handleCargarMasLecturas()
+    }
+  }
+
+  const lecturasTabla = [...lecturasAnteriores, ...lecturas]
 
   const chartData = lecturas.map((l, i) => ({
     muestra: typeof l.muestras === "number" ? l.muestras : i + 1,
@@ -528,15 +674,14 @@ export default function RealtimePage() {
           )}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon">
-            <Settings2 className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon">
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Exportar datos
+          
+          <Button variant="outline" onClick={() => void handleExportar()} disabled={exportando}>
+            {exportando ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Exportar Excel
           </Button>
         </div>
       </div>
@@ -689,7 +834,8 @@ export default function RealtimePage() {
           )}
           {!puedeIniciar && (
             <p className="text-xs text-amber-600">
-              El botón "Iniciar práctica" solo se habilita cuando tienes una reserva activa en este momento.
+              El botón "Iniciar práctica" se habilita durante tu franja reservada (30 min). Puedes repetir
+              la práctica las veces que quieras dentro de ese tiempo.
             </p>
           )}
           {puedeIniciar && !parametrosValidos && (
@@ -759,7 +905,7 @@ export default function RealtimePage() {
                   <div className="h-3 w-3 rounded-full bg-chart-1" />
                   <span className="text-xs text-muted-foreground">Período</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground font-mono">{formatNumber(enVivo?.periodo)}</p>
+                <p className="text-2xl font-bold text-foreground font-mono">{formatNumber(enVivo?.periodo, 5)}</p>
                 <p className="text-xs text-muted-foreground mt-1">segundos</p>
               </div>
               <div className="p-4 rounded-xl border border-border bg-muted/30">
@@ -767,7 +913,7 @@ export default function RealtimePage() {
                   <div className="h-3 w-3 rounded-full bg-chart-2" />
                   <span className="text-xs text-muted-foreground">Gravedad</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground font-mono">{formatNumber(enVivo?.gravedad)}</p>
+                <p className="text-2xl font-bold text-foreground font-mono">{formatNumber(enVivo?.gravedad, 5)}</p>
                 <p className="text-xs text-muted-foreground mt-1">calculada</p>
               </div>
               <div className="p-4 rounded-xl border border-border bg-muted/30">
@@ -775,7 +921,7 @@ export default function RealtimePage() {
                   <div className="h-3 w-3 rounded-full bg-chart-3" />
                   <span className="text-xs text-muted-foreground">Frecuencia</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground font-mono">{formatNumber(enVivo?.frecuencia, 0)}</p>
+                <p className="text-2xl font-bold text-foreground font-mono">{formatNumber(enVivo?.frecuencia, 5)}</p>
                 <p className="text-xs text-muted-foreground mt-1">Hz (crudo)</p>
               </div>
               <div className="p-4 rounded-xl border border-border bg-muted/30">
@@ -783,7 +929,7 @@ export default function RealtimePage() {
                   <div className="h-3 w-3 rounded-full bg-chart-4" />
                   <span className="text-xs text-muted-foreground">Temperatura</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground font-mono">{formatNumber(enVivo?.temperatura, 1)}</p>
+                <p className="text-2xl font-bold text-foreground font-mono">{formatNumber(enVivo?.temperatura, 5)}</p>
                 <p className="text-xs text-muted-foreground mt-1">°C</p>
               </div>
             </div>
@@ -841,10 +987,14 @@ export default function RealtimePage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Registro de Datos</CardTitle>
-          <CardDescription>Últimas {Math.min(lecturas.length, 10)} muestras</CardDescription>
+          <CardDescription>
+            {lecturasTabla.length > 0
+              ? `${lecturasTabla.length} muestras — desplázate hacia abajo para cargar anteriores`
+              : "Sin muestras en la práctica actual"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-80 overflow-y-auto" onScroll={handleTablaScroll}>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
@@ -857,14 +1007,16 @@ export default function RealtimePage() {
                 </tr>
               </thead>
               <tbody>
-                {lecturas.length === 0 ? (
+                {lecturasTabla.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-6 text-center text-muted-foreground">
-                      Aún no hay muestras registradas para este péndulo.
+                      {practicaEnCurso || practicaId
+                        ? "Esperando las primeras muestras de la práctica..."
+                        : "Inicia la práctica para ver los datos en tiempo real."}
                     </td>
                   </tr>
                 ) : (
-                  [...lecturas].slice(-10).reverse().map((l) => {
+                  [...lecturasTabla].reverse().map((l) => {
                     const millis = toMillis(l.timestamp)
                     return (
                       <tr key={l.id} className="border-b border-border/50 hover:bg-muted/50">
@@ -872,16 +1024,27 @@ export default function RealtimePage() {
                           {millis !== null ? new Date(millis).toLocaleTimeString() : "--"}
                         </td>
                         <td className="py-3 px-4 font-mono">{l.muestras ?? "--"}</td>
-                        <td className="py-3 px-4 font-mono">{formatNumber(l.periodo)}</td>
-                        <td className="py-3 px-4 font-mono">{formatNumber(l.gravedad)}</td>
-                        <td className="py-3 px-4 font-mono">{formatNumber(l.frecuencia, 0)}</td>
-                        <td className="py-3 px-4 font-mono">{formatNumber(l.temperatura, 1)}</td>
+                        <td className="py-3 px-4 font-mono">{formatNumber(l.periodo, 5)}</td>
+                        <td className="py-3 px-4 font-mono">{formatNumber(l.gravedad, 5)}</td>
+                        <td className="py-3 px-4 font-mono">{formatNumber(l.frecuencia, 5)}</td>
+                        <td className="py-3 px-4 font-mono">{formatNumber(l.temperatura, 5)}</td>
                       </tr>
                     )
                   })
                 )}
               </tbody>
             </table>
+            {cargandoMasLecturas && (
+              <p className="text-center text-xs text-muted-foreground py-3 flex items-center justify-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Cargando lecturas anteriores...
+              </p>
+            )}
+            {!hayMasLecturas && lecturasTabla.length > 0 && (
+              <p className="text-center text-xs text-muted-foreground py-2">
+                No hay más lecturas anteriores en esta práctica.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>

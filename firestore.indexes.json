@@ -1,4 +1,37 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "lecturas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "practicaId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "lecturas",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "penduloId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reservaciones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "pendulo_id", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "slots_ocupados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "pendulo_id", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

@@ -4,6 +4,7 @@ import { useState, type ChangeEvent, type MouseEvent } from 'react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useAuth } from '@/hooks/useAuth';
 import { useReservations } from '@/hooks/useReservations';
+import { exportarLecturasSesion } from '@/app/services/lecturasExportService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,7 @@ import {
   Activity,
   ChevronDown,
   Filter,
+  Loader2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -23,7 +25,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
 interface Reservacion {
   id: string;
@@ -33,11 +35,17 @@ interface Reservacion {
   estado: string;
   institucion: string;
   pendulo_id: string;
+  practica_id?: string;
 }
 
 function toDate(value: Timestamp | Date): Date {
   if (value instanceof Date) return value;
   return value?.toDate?.() ?? new Date();
+}
+
+function toTimestamp(value: Timestamp | Date): Timestamp {
+  if (value instanceof Timestamp) return value;
+  return Timestamp.fromDate(value);
 }
 
 function getDuracionMinutos(r: Reservacion): number {
@@ -57,6 +65,7 @@ export default function HistorialPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPendulo, setSelectedPendulo] = useState('Todos');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [descargandoId, setDescargandoId] = useState<string | null>(null);
 
   const sesionesCompletadas = reservaciones.filter((r) => r.estado === 'completed');
 
@@ -73,33 +82,18 @@ export default function HistorialPage() {
   );
   const pendolosUnicos = new Set(sesionesCompletadas.map((r) => r.pendulo_id)).size;
 
-  const exportarCSV = () => {
-    if (sesionesCompletadas.length === 0) {
-      alert('No hay sesiones completadas para exportar');
-      return;
+  const handleDescargarSesion = async (r: Reservacion) => {
+    if (!user?.uid) return;
+    setDescargandoId(r.id);
+    try {
+      const inicio = toTimestamp(r.inicio_sesion_reserva);
+      const fin = toTimestamp(r.final_sesion_reserva);
+      await exportarLecturasSesion(r.pendulo_id, user.uid, inicio, fin);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al descargar los datos de la sesión');
+    } finally {
+      setDescargandoId(null);
     }
-    const headers = ['Fecha Inicio', 'Fecha Fin', 'Péndulo', 'Institución', 'Duración', 'Estado'];
-    const rows = sesionesCompletadas.map((r) => {
-      const inicio = toDate(r.inicio_sesion_reserva);
-      const fin = toDate(r.final_sesion_reserva);
-      return [
-        inicio.toLocaleString('es-ES'),
-        fin.toLocaleString('es-ES'),
-        r.pendulo_id,
-        r.institucion,
-        `${getDuracionMinutos(r)} minutos`,
-        'Completada',
-      ];
-    });
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
-    ].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `historial_sesiones_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
   };
 
   return (
@@ -109,21 +103,11 @@ export default function HistorialPage() {
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
 
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">Historial de Sesiones</h1>
-                <p className="text-muted-foreground mt-2">
-                  Revisa el historial completo de tus sesiones completadas
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                onClick={exportarCSV}
-                disabled={sesionesCompletadas.length === 0}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Exportar CSV
-              </Button>
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-foreground">Historial de Sesiones</h1>
+              <p className="text-muted-foreground mt-2">
+                Revisa el historial completo de tus sesiones completadas
+              </p>
             </div>
 
             {/* Stats */}
@@ -210,6 +194,7 @@ export default function HistorialPage() {
                 <CardTitle>Sesiones</CardTitle>
                 <CardDescription>
                   {filtradas.length} sesión{filtradas.length !== 1 ? 'es' : ''} encontrada{filtradas.length !== 1 ? 's' : ''}
+                  {' — '}usa el icono de descarga para exportar las lecturas de cada sesión en Excel
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -227,10 +212,10 @@ export default function HistorialPage() {
                       const fin = toDate(r.final_sesion_reserva);
                       const duracion = getDuracionMinutos(r);
                       const isExpanded = expandedId === r.id;
+                      const descargando = descargandoId === r.id;
 
                       return (
                         <div key={r.id} className="border border-border rounded-lg overflow-hidden">
-                          {/* Main row */}
                           <div
                             className="flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-muted/50 cursor-pointer"
                             onClick={() => setExpandedId(isExpanded ? null : r.id)}
@@ -261,12 +246,18 @@ export default function HistorialPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                title="Descargar lecturas de esta sesión (Excel)"
+                                disabled={descargando}
                                 onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                   e.stopPropagation();
-                                  // lógica de descarga individual si aplica
+                                  void handleDescargarSesion(r);
                                 }}
                               >
-                                <Download className="h-4 w-4" />
+                                {descargando ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Download className="h-4 w-4" />
+                                )}
                               </Button>
                               <ChevronDown
                                 className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -274,7 +265,6 @@ export default function HistorialPage() {
                             </div>
                           </div>
 
-                          {/* Expanded details */}
                           {isExpanded && (
                             <div className="px-4 pb-4 pt-2 border-t border-border bg-muted/30">
                               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
