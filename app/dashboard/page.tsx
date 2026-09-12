@@ -1,14 +1,83 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LogOut, Calendar, BarChart3, Clock, Globe, MapPin } from "lucide-react";
+import { LogOut, Calendar, BarChart3, Clock, Globe, MapPin, ClipboardList } from "lucide-react";
 import Link from "next/link";
+import { Timestamp } from "firebase/firestore";
+import { useReservations } from "@/hooks/useReservations";
+import { listarPracticasDeUsuario } from "@/app/services/penduloDataService";
+import { useModuloEvaluacion } from "@/hooks/useModuloEvaluacion";
+
+const PENDULO_PREDETERMINADO = "UAC-01";
+
+function toDate(value: Timestamp | Date): Date {
+  if (value instanceof Date) return value;
+  return value?.toDate?.() ?? new Date();
+}
+
+function formatFechaCorta(value: Timestamp | Date): string {
+  const date = toDate(value);
+  return date.toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
+  const { reservaciones } = useReservations(user?.uid || "");
+  const { activo: moduloEvaluacion } = useModuloEvaluacion();
+  const [practicasRealizadas, setPracticasRealizadas] = useState(0);
+
+  const penduloIds = useMemo(
+    () => [...new Set([PENDULO_PREDETERMINADO, ...reservaciones.map((r) => r.pendulo_id).filter(Boolean)])],
+    [reservaciones],
+  );
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelado = false;
+    listarPracticasDeUsuario(user.uid, penduloIds)
+      .then((data: { practicaId: string }[]) => {
+        if (!cancelado) setPracticasRealizadas(data.length);
+      })
+      .catch(() => {
+        if (!cancelado) {
+          const desdeReservas = reservaciones.reduce(
+            (acc, r) => acc + (r.practicas_realizadas ?? 0),
+            0,
+          );
+          setPracticasRealizadas(desdeReservas);
+        }
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [user?.uid, penduloIds, reservaciones]);
+
+  const ahora = new Date();
+  const proximaSesion = reservaciones
+    .filter((r) => r.estado !== "cancelled" && toDate(r.inicio_sesion_reserva) > ahora)
+    .sort(
+      (a, b) =>
+        toDate(a.inicio_sesion_reserva).getTime() - toDate(b.inicio_sesion_reserva).getTime(),
+    )[0];
+
+  const tiempoTotalMin = Math.round(
+    reservaciones
+      .filter((r) => r.estado === "completed" || r.estado === "active")
+      .reduce((acc, r) => {
+        const inicio = toDate(r.inicio_sesion_reserva);
+        const fin = toDate(r.final_sesion_reserva);
+        return acc + (fin.getTime() - inicio.getTime()) / 60000;
+      }, 0),
+  );
 
   return (
     <ProtectedRoute requiredRole="Estudiante" exactRole>
@@ -95,6 +164,28 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
+            {moduloEvaluacion ? (
+            <Card className="border-border/50 hover:border-primary/50 transition-colors">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5 text-primary" />
+                  Trabajos asignados
+                </CardTitle>
+                <CardDescription>
+                  Cuestionarios de tus grupos con fecha límite
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Completa una práctica en el péndulo y envía las respuestas. Sin muestras no se puede entregar.
+                </p>
+                <Link href="/dashboard/trabajos">
+                  <Button className="w-full">Ver trabajos</Button>
+                </Link>
+              </CardContent>
+            </Card>
+            ) : null}
+
             {/* Card: Mis Reservas */}
             <Card className="border-border/50 hover:border-primary/50 transition-colors">
               <CardHeader>
@@ -129,7 +220,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Consulta el historial completo de experimentos con gráficas, datos y exportación en CSV.
+                  Consulta el historial de prácticas, con un Excel por práctica y un Excel general.
                 </p>
                 <Link href="/dashboard/historial">
                   <Button className="w-full" variant="outline">Ver Historial</Button>
@@ -206,16 +297,20 @@ export default function DashboardPage() {
             <CardContent>
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-primary mb-1">0</p>
-                  <p className="text-sm text-muted-foreground">Sesiones Completadas</p>
+                  <p className="text-3xl font-bold text-primary mb-1">{practicasRealizadas}</p>
+                  <p className="text-sm text-muted-foreground">Prácticas realizadas</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-primary mb-1">—</p>
-                  <p className="text-sm text-muted-foreground">Próxima Sesión</p>
+                  <p className="text-3xl font-bold text-primary mb-1">
+                    {proximaSesion ? formatFechaCorta(proximaSesion.inicio_sesion_reserva) : "—"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Próxima sesión</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-primary mb-1">—</p>
-                  <p className="text-sm text-muted-foreground">Tiempo Total</p>
+                  <p className="text-3xl font-bold text-primary mb-1">
+                    {tiempoTotalMin > 0 ? `${tiempoTotalMin} min` : "—"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Tiempo total</p>
                 </div>
               </div>
             </CardContent>

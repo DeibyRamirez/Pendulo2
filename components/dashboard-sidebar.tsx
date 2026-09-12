@@ -12,10 +12,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Home,
-  Bot
+  Bot,
+  ClipboardList,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
+import { useModuloEvaluacion } from "@/hooks/useModuloEvaluacion"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -23,12 +25,15 @@ const navigation = [
   { name: "Reservas", href: "/dashboard/reservas", icon: Calendar },
   { name: "Mis Reservas", href: "/dashboard/mis-reservas", icon: Calendar },
   { name: "Historial", href: "/dashboard/historial", icon: History },
+  { name: "Trabajos asignados", href: "/dashboard/trabajos", icon: ClipboardList, plusEvaluacion: true },
   { name: "Agente IA", href: "/dashboard/agente-ia", icon: Bot },
 ]
 
 export function DashboardSidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const { activo: moduloEvaluacion } = useModuloEvaluacion()
+  const itemsVisibles = navigation.filter((item) => !item.plusEvaluacion || moduloEvaluacion)
 
   return (
     <aside className={cn(
@@ -60,7 +65,7 @@ export function DashboardSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2">
-        {navigation.map((item) => {
+        {itemsVisibles.map((item) => {
           const isActive =
             pathname === item.href ||
             (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`))

@@ -40,7 +40,7 @@ interface UsePendulosResult {
  */
 export function usePendulos(): UsePendulosResult {
   const [pendulos, setPendulos] = useState<Pendulo[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Cargar todos los péndulos en tiempo real

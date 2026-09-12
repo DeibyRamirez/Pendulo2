@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
-import { iniciarSesion, iniciarSesionConGoogle } from '../services/authService';
+import { iniciarSesion, iniciarSesionConGoogle, obtenerPerfilUsuario, perfilTieneInstitucion, obtenerRutaDashboardPorRol } from '../services/authService';
 import { useAuth } from '@/hooks/useAuth';
 import { getDashboardPathByRole } from '@/lib/roles';
 import { Button } from "@/components/ui/button"
@@ -87,8 +87,14 @@ export default function LoginPage() {
      try {
        const credencial = await iniciarSesionConGoogle();
        const usuario = credencial.user;
-       const nombre = usuario.displayName || usuario.email?.split('@')[0] || 'Usuario';
+       const perfil = await obtenerPerfilUsuario(usuario.uid);
 
+       if (perfilTieneInstitucion(perfil)) {
+         router.push(`/${obtenerRutaDashboardPorRol(perfil.rol)}`);
+         return;
+       }
+
+       const nombre = usuario.displayName || usuario.email?.split('@')[0] || 'Usuario';
        router.push(
          `/registro?uid=${encodeURIComponent(usuario.uid)}&email=${encodeURIComponent(usuario.email || '')}&nombre=${encodeURIComponent(nombre)}&fotoURL=${encodeURIComponent(usuario.photoURL || '')}`
        );
@@ -189,7 +195,10 @@ export default function LoginPage() {
                   <input type="checkbox" className="rounded border-border" />
                   <span className="text-muted-foreground">Recordarme</span>
                 </label>
-                <Link href="/recuperar" className="text-sm text-primary hover:underline">
+                <Link
+                  href={email.trim() ? `/recuperar?correo=${encodeURIComponent(email.trim())}` : "/recuperar"}
+                  className="text-sm text-primary hover:underline"
+                >
                   ¿Olvidaste tu contraseña?
                 </Link>
               </div>

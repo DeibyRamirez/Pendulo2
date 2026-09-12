@@ -247,7 +247,10 @@ journalctl -u pendulo-bridge -f   # logs en vivo
    (período/gravedad/frecuencia/temperatura) aparecen en vivo en la
    pantalla, sin recargar.
 
-Si todo eso funciona, la instalación está completa para este péndulo.
+Si todo eso funciona, la instalación del bridge está completa para este
+péndulo. La cámara en vivo es otro proceso (MJPG-streamer + túnel HTTPS):
+sigue [`camara-en-vivo.md`](./camara-en-vivo.md). Primero el túnel named
+de Cloudflare (`https://camarapendulo.cheiviz.com`).
 
 ## Si algo falla: solución de problemas
 

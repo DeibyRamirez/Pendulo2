@@ -7,7 +7,8 @@
  *
  * Funciones disponibles:
  *   - iniciarSesion(email, password)
- *   - registrarUsuario(email, password, nombre, institucion)
+ *   - enviarCorreoRecuperacion(email)
+ *   - confirmarNuevaContrasena(codigo, nuevaContrasena)
  *   - cerrarSesion()
  * ─────────────────────────────────────────────────────────────
  */
@@ -19,8 +20,11 @@ import {
   signInWithPopup,
   signOut,
   updateProfile,
+  sendPasswordResetEmail,
+  confirmPasswordReset,
+  verifyPasswordResetCode,
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { normalizeRole } from '@/lib/roles';
 
@@ -48,6 +52,16 @@ async function validarSesionInstitucional(user) {
 export async function iniciarSesion(email, password) {
   const credencial = await signInWithEmailAndPassword(auth, email, password);
   return credencial;
+}
+
+export async function obtenerPerfilUsuario(uid) {
+  if (!uid) return null;
+  const snap = await getDoc(doc(db, 'usuarios', uid));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+export function perfilTieneInstitucion(perfil) {
+  return Boolean(perfil && String(perfil.institucion || '').trim());
 }
 
 /**
@@ -101,32 +115,111 @@ export async function registrarUsuario(email, password, nombre, institucion) {
  * Guarda los datos institucionales en Firestore sin duplicar la cuenta.
  */
 export async function completarRegistroGoogle({ uid, email, nombre, institucion, fotoURL }) {
-  if (!uid || !email) {
-    throw new Error('No se encontró una sesión válida de Google');
+  const usuario = auth.currentUser;
+  if (!usuario) {
+    throw new Error('Tu sesión de Google expiró. Vuelve a iniciar sesión.');
   }
 
-  await setDoc(
-    doc(db, 'usuarios', uid),
-    {
-      uid,
-      email,
-      nombre: nombre || email.split('@')[0],
-      rol: 'Estudiante',
-      estado: 'active',
-      creadoEn: new Date().toISOString(),
+  const uidFinal = usuario.uid;
+  const emailFinal = usuario.email || email;
+  if (!uidFinal || !emailFinal) {
+    throw new Error('No se encontró una sesión válida de Google');
+  }
+  if (uid && uid !== uidFinal) {
+    throw new Error('La sesión de Google no coincide. Vuelve a iniciar sesión.');
+  }
+  if (!validarDominioInstitucional(emailFinal)) {
+    throw new Error('El correo debe terminar en .edu.co');
+  }
+
+  const ref = doc(db, 'usuarios', uidFinal);
+  const existente = await getDoc(ref);
+
+  if (existente.exists()) {
+    const datos = existente.data() || {};
+    if (String(datos.institucion || '').trim()) {
+      return { ...datos, id: existente.id };
+    }
+    await updateDoc(ref, {
       institucion,
-      fotoURL: fotoURL || null,
-      proveedor: 'google',
-    },
-    { merge: true }
-  );
+      fotoURL: fotoURL || usuario.photoURL || datos.fotoURL || null,
+      proveedor: datos.proveedor || 'google',
+    });
+    return { ...datos, id: existente.id, institucion };
+  }
+
+  await setDoc(ref, {
+    uid: uidFinal,
+    email: emailFinal,
+    nombre: nombre || usuario.displayName || emailFinal.split('@')[0],
+    rol: 'Estudiante',
+    estado: 'active',
+    creadoEn: new Date().toISOString(),
+    institucion,
+    fotoURL: fotoURL || usuario.photoURL || null,
+    proveedor: 'google',
+  });
+  return { uid: uidFinal, email: emailFinal, rol: 'Estudiante', institucion };
 }
 
 export function obtenerRutaDashboardPorRol(rol) {
   const normalizedRole = normalizeRole(rol);
-  if (normalizedRole === 'Admin') return '/admin';
-  if (normalizedRole === 'Docente') return '/docente';
-  return '/dashboard';
+  if (normalizedRole === 'Admin') return 'admin';
+  if (normalizedRole === 'Docente') return 'docente';
+  return 'dashboard';
+}
+
+/**
+ * Envía el correo de Firebase para restablecer la contraseña.
+ * No revela si el correo existe (evita enumerar cuentas).
+ */
+export async function enviarCorreoRecuperacion(email) {
+  const correo = String(email || '').trim().toLowerCase();
+  if (!correo) {
+    throw new Error('El correo es obligatorio');
+  }
+  if (!correo.includes('@')) {
+    const error = new Error('El formato del correo no es válido.');
+    error.code = 'auth/invalid-email';
+    throw error;
+  }
+
+  const origen = typeof window !== 'undefined' ? window.location.origin : '';
+  try {
+    await sendPasswordResetEmail(auth, correo, {
+      url: `${origen}/login`,
+      handleCodeInApp: false,
+    });
+  } catch (error) {
+    if (error?.code === 'auth/user-not-found') {
+      return;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Comprueba que el código del enlace de recuperación siga vigente.
+ */
+export async function verificarCodigoRecuperacion(codigo) {
+  if (!codigo) {
+    throw new Error('El enlace de recuperación no es válido.');
+  }
+  return verifyPasswordResetCode(auth, codigo);
+}
+
+/**
+ * Guarda la nueva contraseña a partir del código del correo.
+ */
+export async function confirmarNuevaContrasena(codigo, nuevaContrasena) {
+  const clave = String(nuevaContrasena || '');
+  if (!codigo) {
+    throw new Error('El enlace de recuperación no es válido.');
+  }
+  if (clave.length < 8) {
+    throw new Error('La contraseña debe tener al menos 8 caracteres.');
+  }
+  await confirmPasswordReset(auth, codigo, clave);
 }
 
 /**

@@ -25,6 +25,11 @@ lograrlo.
    — **guía para el equipo**: paso a paso completo para instalar este
    mismo bridge en otra Raspberry Pi / otro péndulo físico nuevo, incluido
    el registro del péndulo en la web y el checklist de requisitos previos.
+7. [`camara-en-vivo.md`](./camara-en-vivo.md) — publicar el MJPEG con
+   Cloudflare Tunnel named + `https://camarapendulo.cheiviz.com`. Scripts
+   en `scripts/camara/`.
+8. [`flujos-excel.md`](./flujos-excel.md) — diagramas de cada descarga de
+   Excel (estudiante, docente de dos hojas, cuestionario/plus y admin).
 
 Para instrucciones de **instalación/despliegue** del bridge en la
 Raspberry Pi (referencia técnica completa, con comandos, incluye

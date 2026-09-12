@@ -103,3 +103,4 @@ sequenceDiagram
 | Node-RED | Raspberry Pi | Node-RED (ya instalado por el docente) | Traduce MQTT ↔ Serial en ambas direcciones |
 | Mosquitto | Raspberry Pi | Broker MQTT local | Mensajería entre Node-RED y el bridge, solo en `localhost` |
 | Microcontrolador | Físico, junto al péndulo | Firmware propio | Mide oscilaciones, ejecuta `cfg`/`str`, envía datos por serial |
+| Cámara MJPEG | Raspberry Pi → Cloudflare Tunnel (`camarapendulo.cheiviz.com`) | MJPG-streamer + HTTPS | El navegador pide `NEXT_PUBLIC_CAMARA_URL`; no pasa por Firestore. Ver `docs/camara-en-vivo.md`. |

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react"
-import { completarRegistroGoogle, registrarUsuario, validarDominioInstitucional } from "@/app/services/authService"
+import { completarRegistroGoogle, obtenerPerfilUsuario, obtenerRutaDashboardPorRol, perfilTieneInstitucion, registrarUsuario, validarDominioInstitucional } from "@/app/services/authService"
 
 const INSTITUCIONES = [
   { value: "Corporación Universitaria Autónoma del Cauca", label: "Corporación Universitaria Autónoma del Cauca" },
@@ -23,6 +23,7 @@ const INSTITUCIONES = [
 export default function RegistroPage() {
   const router = useRouter()
   const [googleSession, setGoogleSession] = useState({ uid: "", email: "", nombre: "", fotoURL: "" })
+  const [comprobandoPerfil, setComprobandoPerfil] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -51,7 +52,32 @@ export default function RegistroPage() {
         email: email || prev.email,
       }))
     }
-  }, [])
+
+    let cancelado = false
+    async function comprobarSiYaExiste() {
+      if (!uid) {
+        setComprobandoPerfil(false)
+        return
+      }
+      try {
+        const perfil = await obtenerPerfilUsuario(uid)
+        if (cancelado) return
+        if (perfilTieneInstitucion(perfil)) {
+          router.replace(`/${obtenerRutaDashboardPorRol(perfil.rol)}`)
+          return
+        }
+      } catch (error) {
+        console.error("Error al comprobar el perfil:", error)
+      } finally {
+        if (!cancelado) setComprobandoPerfil(false)
+      }
+    }
+
+    void comprobarSiYaExiste()
+    return () => {
+      cancelado = true
+    }
+  }, [router])
 
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {}
@@ -103,13 +129,15 @@ export default function RegistroPage() {
 
       try {
         if (googleSession.uid) {
-          await completarRegistroGoogle({
+          const perfil = await completarRegistroGoogle({
             uid: googleSession.uid,
             email: formData.email,
             nombre: formData.nombre,
             institucion: formData.institucion,
             fotoURL: googleSession.fotoURL,
           })
+          router.replace(`/${obtenerRutaDashboardPorRol(perfil?.rol)}`)
+          return
         } else {
           // Registro real con Firebase Auth
           await registrarUsuario(formData.email, formData.password, formData.nombre, formData.institucion)
@@ -141,6 +169,17 @@ export default function RegistroPage() {
   }
 
   const { strength, label: strengthLabel, color: strengthColor } = passwordStrength()
+
+  if (comprobandoPerfil) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Comprobando tu cuenta...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (step === 3) {
     return (

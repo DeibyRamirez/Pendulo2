@@ -1,0 +1,28 @@
+# MediaMTX opcional (solo si se activa WebRTC).
+# El <img> de CameraStream NO usa este archivo.
+# En Vercel: NEXT_PUBLIC_CAMARA_PROTOCOLO=webrtc
+#            NEXT_PUBLIC_CAMARA_URL=https://….ts.net/cam
+#
+# No publiques UDP crudo ni playit.gg hacia el navegador.
+
+webrtc: true
+hls: false
+rtsp: true
+
+# WHEP en :8889  →  /cam/whep
+webrtcAddress: :8889
+# Orígenes de la web (Vercel + local). Sin esto el fetch WHEP falla por CORS.
+webrtcAdditionalHosts: []
+webrtcAllowOrigins:
+  - https://TU-PROYECTO.vercel.app
+  - http://localhost:3000
+
+# Si hay NAT universitario y el Funnel no basta para ICE, hace falta TURN
+# en la VPS. No lo actives hasta que WHEP falle de verdad.
+# webrtcICEServers2:
+#   - url: stun:stun.l.google.com:19302
+
+paths:
+  cam:
+    # Fuente local: MJPEG del streamer o cámara de la Pi.
+    source: http://127.0.0.1:8080/?action=stream

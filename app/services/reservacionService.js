@@ -221,6 +221,25 @@ export async function validarConflictosHorario(pendulo_id, inicio, final) {
   }
 }
 
+export const DURACION_RESERVA_MS = 30 * 60 * 1000;
+
+/**
+ * El control del péndulo lo define la reserva vigente, no los grupos de trabajo.
+ * No lee reservaciones ajenas: usa practicaInicio del documento público.
+ */
+export function hayControlAjenoVigente(penduloData, usuarioId, ahoraMs = Date.now()) {
+  if (!penduloData?.usuarioActivo || penduloData.usuarioActivo === usuarioId) {
+    return false;
+  }
+  const inicioPractica = penduloData.practicaInicio?.toMillis?.() ?? 0;
+  if (!inicioPractica) return false;
+  return ahoraMs - inicioPractica < DURACION_RESERVA_MS;
+}
+
+function lockDeOtroUsuarioVigente(_transaction, penduloData, usuarioId, ahora) {
+  return hayControlAjenoVigente(penduloData, usuarioId, ahora.toMillis());
+}
+
 /**
  * Inicia práctica: lock exclusivo del péndulo + sesión activa en Firestore.
  */
@@ -251,16 +270,22 @@ export async function iniciarPractica({ reservacionId, penduloId, usuarioId }) {
 
     const penduloSnap = await transaction.get(penduloRef);
     const penduloData = penduloSnap.exists() ? penduloSnap.data() : {};
-    if (
-      penduloData.usuarioActivo &&
-      penduloData.usuarioActivo !== usuarioId
-    ) {
-      throw new Error('Otro estudiante tiene el control del péndulo en este momento');
+    const lockAjenoVigente = await lockDeOtroUsuarioVigente(
+      transaction,
+      penduloData,
+      usuarioId,
+      ahora,
+    );
+    if (lockAjenoVigente) {
+      throw new Error(
+        'Ocupado: otro usuario tiene el control del péndulo en su franja de 30 minutos.',
+      );
     }
 
     transaction.update(reservacionRef, {
       estado: 'active',
       practica_id: practicaId,
+      practicas_realizadas: (reservacion.practicas_realizadas ?? 0) + 1,
       fecha_actualizacion: Timestamp.now(),
     });
 
@@ -271,6 +296,7 @@ export async function iniciarPractica({ reservacionId, penduloId, usuarioId }) {
         practicaId,
         practicaInicio,
         penduloId,
+        reservacionId,
       },
       { merge: true },
     );
@@ -303,7 +329,7 @@ export async function liberarPractica({ reservacionId, penduloId, usuarioId }) {
       throw new Error('No tienes permiso para liberar esta práctica');
     }
 
-    const practicasRealizadas = (reservacion.practicas_realizadas ?? 0) + 1;
+    const practicasRealizadas = reservacion.practicas_realizadas ?? 0;
 
     transaction.update(reservacionRef, {
       estado: 'active',
@@ -317,6 +343,7 @@ export async function liberarPractica({ reservacionId, penduloId, usuarioId }) {
         usuarioActivo: null,
         practicaId: null,
         practicaInicio: null,
+        reservacionId: null,
       },
       { merge: true },
     );
@@ -355,6 +382,7 @@ export async function completarReservacion({ reservacionId, penduloId, usuarioId
           usuarioActivo: null,
           practicaId: null,
           practicaInicio: null,
+          reservacionId: null,
         },
         { merge: true },
       );

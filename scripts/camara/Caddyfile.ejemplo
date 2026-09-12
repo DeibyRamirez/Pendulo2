@@ -1,0 +1,14 @@
+# Caddy en la VPS. Termina HTTPS y proxy al MJPEG que frp deja en :8080.
+# Dominio gratis recomendado: DuckDNS (camara-uac-01.duckdns.org)
+# o deSEC (camara-uac-01.dedyn.io). No uses playit.gg aquí.
+
+camara-uac-01.duckdns.org {
+	reverse_proxy 127.0.0.1:8080
+
+	header {
+		# El <img> de Vercel no necesita CORS; WebRTC WHEP sí.
+		Access-Control-Allow-Origin *
+		Access-Control-Allow-Methods "GET, POST, DELETE, OPTIONS"
+		Access-Control-Allow-Headers "Content-Type"
+	}
+}

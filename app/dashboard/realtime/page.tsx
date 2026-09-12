@@ -19,14 +19,11 @@ import {
 import {
   Play,
   Download,
-  Maximize2,
-  Settings2,
   CheckCircle2,
   Loader2,
   WifiOff,
   Gauge,
   AlertTriangle,
-  Clock,
 } from "lucide-react"
 import { useState, useEffect, useRef, type UIEvent } from "react"
 import {
@@ -41,9 +38,9 @@ import {
 import { CameraStream } from "@/components/camera-stream"
 import { useAuth } from "@/hooks/useAuth"
 import { usePenduloData, type LecturaPendulo } from "@/hooks/usePenduloData"
-import { escucharReservacionesUsuario, iniciarPractica, liberarPractica, completarReservacion } from "@/app/services/reservacionService"
+import { escucharReservacionesUsuario, iniciarPractica, liberarPractica, completarReservacion, hayControlAjenoVigente } from "@/app/services/reservacionService"
 import { escucharEstadoComando, cargarLecturasAnteriores } from "@/app/services/penduloDataService"
-import { exportarLecturasUsuario, exportarLecturasAdmin } from "@/app/services/lecturasExportService"
+import { exportarLecturasUsuario, exportarExcelGeneral, exportarLecturasAdmin } from "@/app/services/lecturasExportService"
 import type { Timestamp } from "firebase/firestore"
 import {
   checkFirebaseEnv,
@@ -54,6 +51,11 @@ import {
   resolveSignalState,
   type SignalState,
 } from "@/lib/penduloDiagnostics"
+import {
+  diagnosticarPendulo,
+  resumenEstudiante,
+} from "@/lib/diagnosticoPendulo"
+import { parametrosCfgHaciaFirmware } from "@/lib/parametrosFirmwarePendulo"
 
 // Debe coincidir con DEFAULT_PENDULO_ID configurado en el bridge (bridge/.env)
 const DEFAULT_PENDULO_ID = "UAC-01"
@@ -67,19 +69,13 @@ const OSCILACIONES_MAX = 20
 const DISTANCIA_MURO_MIN = 1
 const DISTANCIA_MURO_MAX = 20
 
-// Node-RED: cfg → espera → str (bridge/node-red-command-flow.json).
+// Node-RED espera 15 s entre cfg y str (bridge/node-red-command-flow.json).
 const SEGUNDOS_CFG_NODE_RED = 15
-// Tiempo aprox. desde str hasta la 1ª muestra en Firestore (hardware + 1ª oscilación).
-const SEGUNDOS_ARRANQUE_HARDWARE = 11
-const SEGUNDOS_ESPERA_ARRANQUE_TOTAL = SEGUNDOS_CFG_NODE_RED + SEGUNDOS_ARRANQUE_HARDWARE
-/** @deprecated Usar SEGUNDOS_CFG_NODE_RED; alias para bloqueo de "Finalizar". */
-const SEGUNDOS_CONFIGURACION = SEGUNDOS_CFG_NODE_RED
 // Si el comando sigue "pendiente" tras este tiempo, avisamos (el bridge puede
 // tener el listener de Firestore colgado aunque systemd diga "running").
 const SEGUNDOS_ESPERA_BRIDGE = 30
 
 type EstadoComandoUi = "pendiente" | "enviado" | "error" | null
-type FaseArranque = "configurando" | "arrancando" | "listo" | "demora"
 
 interface ComandoPenduloDoc {
   id: string
@@ -115,6 +111,18 @@ function toMillis(ts: Timestamp | undefined): number | null {
   return date ? date.getTime() : null
 }
 
+function limitarOscilaciones(valor: unknown): number | null {
+  if (typeof valor !== "number" || Number.isNaN(valor)) return null
+  const entero = Math.round(valor)
+  if (entero < OSCILACIONES_MIN || entero > OSCILACIONES_MAX) return null
+  return entero
+}
+
+interface MetricChartPoint {
+  muestra: number
+  [key: string]: number | null
+}
+
 export default function RealtimePage() {
   const { user, rol } = useAuth()
   const [mounted, setMounted] = useState(false)
@@ -131,6 +139,7 @@ export default function RealtimePage() {
   const estadoDispositivoPrevRef = useRef<string | null>(null)
   const [reservaciones, setReservaciones] = useState<Reservacion[]>([])
   const [oscilaciones, setOscilaciones] = useState(10)
+  const [oscilacionesPractica, setOscilacionesPractica] = useState<number | null>(null)
   const [distanciaMuro, setDistanciaMuro] = useState(10)
   const [practicaEnCurso, setPracticaEnCurso] = useState(false)
   const [practicaId, setPracticaId] = useState<string | null>(null)
@@ -139,6 +148,7 @@ export default function RealtimePage() {
   const [cargandoMasLecturas, setCargandoMasLecturas] = useState(false)
   const [hayMasLecturas, setHayMasLecturas] = useState(true)
   const [exportando, setExportando] = useState(false)
+  const [exportandoGeneral, setExportandoGeneral] = useState(false)
   const [arranqueIniciadoEn, setArranqueIniciadoEn] = useState<number | null>(null)
   const [nowTick, setNowTick] = useState(() => Date.now())
 
@@ -158,7 +168,7 @@ export default function RealtimePage() {
     }
   }, [])
 
-  // Reloj para la cuenta atrás de arranque (~26 s total).
+  // Reloj de "preparando" mientras llegan cfg → str → CFGOK y las mediciones.
   useEffect(() => {
     if (arranqueIniciadoEn === null) return
     const interval = setInterval(() => setNowTick(Date.now()), 250)
@@ -200,11 +210,12 @@ export default function RealtimePage() {
     enviandoComando,
     error: errorPendulo,
   } = usePenduloData(penduloId, {
-    cantidadLecturas: 10,
-    uid: practicaEnCurso ? user?.uid ?? null : null,
-    practicaInicio: practicaEnCurso ? practicaInicio : null,
+    cantidadLecturas: OSCILACIONES_MAX,
+    uid: practicaInicio ? user?.uid ?? null : null,
+    practicaInicio,
   })
 
+  const ocupadoPorOtro = hayControlAjenoVigente(enVivo, user?.uid)
   const practicaFinalizada = enVivo?.estado === "finalizado"
   const practicaConError = enVivo?.estado === "error"
   const hayDatosEnVivo =
@@ -220,38 +231,40 @@ export default function RealtimePage() {
   const elapsedArranqueSeg =
     arranqueIniciadoEn !== null ? Math.max(0, (nowTick - arranqueIniciadoEn) / 1000) : 0
 
-  const segundosRestantesTotal =
-    arranqueIniciadoEn !== null && !arranqueListo
-      ? Math.max(0, Math.ceil(SEGUNDOS_ESPERA_ARRANQUE_TOTAL - elapsedArranqueSeg))
-      : 0
-
   const segundosBloqueoFinalizar =
-    arranqueIniciadoEn !== null
+    arranqueIniciadoEn !== null && !arranqueListo
       ? Math.max(0, Math.ceil(SEGUNDOS_CFG_NODE_RED - elapsedArranqueSeg))
       : 0
 
-  const faseArranque: FaseArranque | null = (() => {
-    if (!practicaEnCurso || arranqueIniciadoEn === null) return null
-    if (arranqueListo) return "listo"
-    if (elapsedArranqueSeg < SEGUNDOS_CFG_NODE_RED) return "configurando"
-    if (elapsedArranqueSeg < SEGUNDOS_ESPERA_ARRANQUE_TOTAL) return "arrancando"
-    return "demora"
-  })()
-
-  const mostrarPanelArranque =
-    practicaEnCurso && arranqueIniciadoEn !== null && !practicaFinalizada && !practicaConError
+  const diagnosticoEstudiante = diagnosticarPendulo({
+    ultimoRaw: enVivo?.ultimoRaw,
+    estadoDispositivo: enVivo?.estadoDispositivo,
+    estado: enVivo?.estado,
+    errorCodigo: enVivo?.errorCodigo,
+    errorMensaje: enVivo?.errorMensaje,
+    periodo: enVivo?.periodo,
+    gravedad: enVivo?.gravedad,
+    medicionInvalida: enVivo?.medicionInvalida,
+    segundosDesdeUltimoDato,
+    umbralSinSenal: SEGUNDOS_SIN_SENAL,
+  })
+  const mostrarAvisoReseted =
+    practicaEnCurso && diagnosticoEstudiante.codigo === "reseted"
 
   // Texto legible de la última señal de confirmación del hardware (handshake
   // serial reenviado por Node-RED vía "pendulo/estado"). Puede no existir
   // todavía si Node-RED no está reenviando estas señales al broker.
   const ESTADO_DISPOSITIVO_LABEL: Record<string, string> = {
-    configurando: "Enviando configuración al péndulo…",
-    configurado: "Péndulo confirmó la configuración",
-    iniciando: "Enviando orden de inicio…",
+    configurando: "cfg recibido (oscilaciones y distancia)",
+    configurado: "CFGOK — el péndulo confirmó la configuración",
+    iniciando: "str enviado — el péndulo inicia el movimiento",
     iniciado: "Péndulo confirmó el inicio",
     recibiendo_datos: "Péndulo transmitiendo datos",
     finalizado: "Péndulo confirmó el fin de la práctica",
-    detenido: "Péndulo detenido",
+    detenido: "STOPED — péndulo en espera",
+    reseted: "Péndulo en RESET (esperando configuración)",
+    error_laser: "Error de láser / fotocompuerta",
+    error_microswitch: "Error de microswitch",
   }
   const estadoDispositivoLabel = enVivo?.estadoDispositivo
     ? ESTADO_DISPOSITIVO_LABEL[enVivo.estadoDispositivo] ?? null
@@ -410,7 +423,33 @@ export default function RealtimePage() {
     })
   }, [enVivo?.estadoDispositivo, enVivo?.oscilacionesConfirmadas, enVivo?.distanciaMuroConfirmada, penduloId])
 
+  // Si llega telemetría (o IDS) después de pulsar Iniciar, el timeout del
+  // bridge era un falso positivo: el aparato sí respondió.
+  useEffect(() => {
+    if (arranqueIniciadoEn === null) return
+    if (estadoComando !== "pendiente" && estadoComando !== "error") return
+    const actualizadoMs = enVivo?.actualizadoEn?.toDate?.()?.getTime()
+    const datoTrasArranque =
+      typeof actualizadoMs === "number" && actualizadoMs >= arranqueIniciadoEn
+    if (!datoTrasArranque) return
+
+    comandoPendienteRef.current = false
+    if (comandoTimeoutRef.current !== null) {
+      window.clearTimeout(comandoTimeoutRef.current)
+      comandoTimeoutRef.current = null
+    }
+    setEstadoComando("enviado")
+    setMensajeComando("El péndulo respondió. La práctica está en curso.")
+  }, [arranqueIniciadoEn, enVivo?.actualizadoEn, estadoComando])
+
   const handleStartPractice = async () => {
+    if (ocupadoPorOtro) {
+      setEstadoComando("error")
+      setMensajeComando(
+        "Ocupado: otro usuario tiene el control del péndulo en su franja de 30 minutos.",
+      )
+      return
+    }
     if (!puedeIniciar || !user?.uid || !parametrosValidos || practicaEnCurso || !reservaEnTurno) {
       penduloDiag.warn("Comando", "Inicio de práctica bloqueado", {
         puedeIniciar,
@@ -427,6 +466,7 @@ export default function RealtimePage() {
     setMensajeComando(null)
     setLecturasAnteriores([])
     setHayMasLecturas(true)
+    setOscilacionesPractica(oscilaciones)
     comandoUnsubRef.current?.()
     if (comandoTimeoutRef.current !== null) {
       window.clearTimeout(comandoTimeoutRef.current)
@@ -442,11 +482,12 @@ export default function RealtimePage() {
       setPracticaInicio(inicioPractica)
       finalizadoRef.current = false
 
+      const cfgFirmware = parametrosCfgHaciaFirmware(oscilaciones, distanciaMuro)
       const comandoId = await enviarComando({
         usuarioId: user.uid,
         accion: "iniciar",
-        oscilaciones,
-        distanciaMuro,
+        oscilaciones: cfgFirmware.oscilaciones,
+        distanciaMuro: cfgFirmware.distanciaMuro,
         reservacionId: reservaEnTurno.id,
         practicaId: nuevaPracticaId,
       })
@@ -455,7 +496,13 @@ export default function RealtimePage() {
       setEstadoComando("pendiente")
       setMensajeComando("Comando enviado. Esperando confirmación del bridge en la Raspberry Pi…")
       comandoPendienteRef.current = true
-      logBridgeCommandState("pendiente", { comandoId, penduloId, oscilaciones, distanciaMuro })
+      logBridgeCommandState("pendiente", {
+        comandoId,
+        penduloId,
+        oscilacionesSolicitadas: oscilaciones,
+        distanciaSolicitada: distanciaMuro,
+        cfgFirmware,
+      })
 
       comandoUnsubRef.current = escucharEstadoComando(
         comandoId,
@@ -470,7 +517,7 @@ export default function RealtimePage() {
             setEstadoComando("enviado")
             setMensajeComando("Comando recibido por el bridge. El péndulo debería configurarse en unos segundos.")
             logBridgeCommandState("enviado", { comandoId, penduloId, atendidoEn: data.atendidoEn })
-            penduloDiag.info("Sistema", `Arranque estimado ~${SEGUNDOS_ESPERA_ARRANQUE_TOTAL}s (${SEGUNDOS_CFG_NODE_RED}s cfg + ~${SEGUNDOS_ARRANQUE_HARDWARE}s movimiento)`, {
+            penduloDiag.info("Sistema", "Handshake guiado por comandos: STOPED → cfg → str → CFGOK → mediciones", {
               comandoId,
             })
             comandoUnsubRef.current?.()
@@ -520,7 +567,7 @@ export default function RealtimePage() {
         if (!comandoPendienteRef.current) return
         setEstadoComando("error")
         setMensajeComando(
-          "El bridge no confirmó el comando en Firestore a tiempo. El servicio puede estar corriendo pero con el listener colgado — en la Pi ejecuta: sudo systemctl restart pendulo-bridge. Si el péndulo sí se movió, ignora este aviso. Revisa pendulo_comandos en Firebase Console."
+          "No se confirmó el arranque. Espera o avisa al docente."
         )
         logBridgeCommandState("timeout", {
           comandoId,
@@ -529,10 +576,13 @@ export default function RealtimePage() {
         })
       }, SEGUNDOS_ESPERA_BRIDGE * 1000)
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Error al enviar comando de inicio."
-      penduloDiag.error("Comando", "Fallo al iniciar práctica", { error: message, penduloId })
+      const crudo = err instanceof Error ? err.message : "Error al enviar comando de inicio."
+      const message = /insufficient permissions|permission-denied/i.test(crudo)
+        ? "Firestore rechazó el inicio (permisos). Recarga la página e inténtalo de nuevo."
+        : crudo
+      penduloDiag.error("Comando", "Fallo al iniciar práctica", { error: crudo, penduloId })
       setEstadoComando("error")
-      setMensajeComando(err instanceof Error ? err.message : "Error al enviar comando de inicio.")
+      setMensajeComando(message)
       setPracticaEnCurso(false)
       setArranqueIniciadoEn(null)
     }
@@ -570,19 +620,31 @@ export default function RealtimePage() {
     if (!user?.uid) return
     setExportando(true)
     try {
-      if (rol === "Admin") {
-        await exportarLecturasAdmin(penduloId)
-      } else {
-        if (!practicaId) {
-          alert("No hay una práctica activa o reciente para exportar")
-          return
-        }
-        await exportarLecturasUsuario(penduloId, user.uid, practicaId)
+      if (!practicaId) {
+        alert("No hay una práctica activa o reciente para exportar")
+        return
       }
+      await exportarLecturasUsuario(penduloId, user.uid, practicaId)
     } catch (err) {
       alert(err instanceof Error ? err.message : "Error al exportar datos")
     } finally {
       setExportando(false)
+    }
+  }
+
+  const handleExportarGeneral = async () => {
+    if (!user?.uid) return
+    setExportandoGeneral(true)
+    try {
+      if (rol === "Admin") {
+        await exportarLecturasAdmin(penduloId)
+      } else {
+        await exportarExcelGeneral(penduloId, user.uid)
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Error al exportar el Excel general")
+    } finally {
+      setExportandoGeneral(false)
     }
   }
 
@@ -599,10 +661,10 @@ export default function RealtimePage() {
         penduloId,
         user.uid,
         practicaInicio,
-        10,
+        OSCILACIONES_MAX,
         masAntigua.timestamp,
       )
-      if (anteriores.length < 10) {
+      if (anteriores.length < OSCILACIONES_MAX) {
         setHayMasLecturas(false)
       }
       if (anteriores.length > 0) {
@@ -626,15 +688,47 @@ export default function RealtimePage() {
     }
   }
 
-  const lecturasTabla = [...lecturasAnteriores, ...lecturas]
+  const lecturasDePractica = [...lecturasAnteriores, ...lecturas]
+    .filter((l) => !practicaId || !l.practicaId || l.practicaId === practicaId)
+    .sort((a, b) => (toMillis(a.timestamp) ?? 0) - (toMillis(b.timestamp) ?? 0))
+  const maxMuestraHardware = lecturasDePractica.reduce((maximo, l) => {
+    const n =
+      typeof l.muestras === "number" ? l.muestras : typeof l.muestra === "number" ? l.muestra : 0
+    return n > maximo ? n : maximo
+  }, lecturasDePractica.length)
+  const maxMuestrasGrafica = Math.min(
+    OSCILACIONES_MAX,
+    Math.max(
+      limitarOscilaciones(enVivo?.oscilacionesConfirmadas) ?? 0,
+      limitarOscilaciones(oscilacionesPractica) ?? 0,
+      limitarOscilaciones(oscilaciones) ?? 0,
+      maxMuestraHardware,
+      1,
+    ),
+  )
+  const lecturasTabla = lecturasDePractica
+    .map((l, i) => {
+      const muestraHardware =
+        typeof l.muestras === "number" ? l.muestras : typeof l.muestra === "number" ? l.muestra : null
+      const muestra = muestraHardware !== null && muestraHardware >= 1 ? muestraHardware : i + 1
+      return { ...l, muestra }
+    })
+    .sort((a, b) => a.muestra - b.muestra)
 
-  const chartData = lecturas.map((l, i) => ({
-    muestra: typeof l.muestras === "number" ? l.muestras : i + 1,
-    periodo: typeof l.periodo === "number" ? l.periodo : null,
-    gravedad: typeof l.gravedad === "number" ? l.gravedad : null,
-    frecuencia: typeof l.frecuencia === "number" ? l.frecuencia : null,
-    temperatura: typeof l.temperatura === "number" ? l.temperatura : null,
-  }))
+  const chartData = Array.from(
+    lecturasTabla
+      .reduce((mapa, l) => {
+        mapa.set(l.muestra, {
+          muestra: l.muestra,
+          periodo: typeof l.periodo === "number" ? l.periodo : null,
+          gravedad: typeof l.gravedad === "number" ? l.gravedad : null,
+          frecuencia: typeof l.frecuencia === "number" ? l.frecuencia : null,
+          temperatura: typeof l.temperatura === "number" ? l.temperatura : null,
+        })
+        return mapa
+      }, new Map<number, MetricChartPoint>())
+      .values(),
+  ).sort((a, b) => a.muestra - b.muestra)
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -673,15 +767,26 @@ export default function RealtimePage() {
             <p className="text-xs text-primary mt-1 font-medium">{estadoDispositivoLabel}</p>
           )}
         </div>
-        <div className="flex gap-2">
-          
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => void handleExportar()} disabled={exportando}>
             {exportando ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Download className="mr-2 h-4 w-4" />
             )}
-            Exportar Excel
+            Excel de esta práctica
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => void handleExportarGeneral()}
+            disabled={exportandoGeneral}
+          >
+            {exportandoGeneral ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Excel general
           </Button>
         </div>
       </div>
@@ -710,7 +815,7 @@ export default function RealtimePage() {
                   max={OSCILACIONES_MAX}
                   value={oscilaciones}
                   onChange={(e) => setOscilaciones(Number(e.target.value))}
-                  disabled={!puedeIniciar || enviandoComando || practicaEnCurso}
+                  disabled={!puedeIniciar || ocupadoPorOtro || enviandoComando || practicaEnCurso}
                   className="w-32"
                 />
               </div>
@@ -725,14 +830,14 @@ export default function RealtimePage() {
                   max={DISTANCIA_MURO_MAX}
                   value={distanciaMuro}
                   onChange={(e) => setDistanciaMuro(Number(e.target.value))}
-                  disabled={!puedeIniciar || enviandoComando || practicaEnCurso}
+                  disabled={!puedeIniciar || ocupadoPorOtro || enviandoComando || practicaEnCurso}
                   className="w-36"
                 />
               </div>
               {mounted ? (
                 <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
                   <AlertDialogTrigger asChild>
-                    <Button disabled={!puedeIniciar || enviandoComando || !parametrosValidos || practicaEnCurso}>
+                    <Button disabled={!puedeIniciar || ocupadoPorOtro || enviandoComando || !parametrosValidos || practicaEnCurso}>
                       {enviandoComando ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
@@ -754,11 +859,8 @@ export default function RealtimePage() {
                             <li><strong>{distanciaMuro}</strong> cm de distancia del muro</li>
                           </ul>
                           <p>
-                            El péndulo tarda aproximadamente{" "}
-                            <strong>{SEGUNDOS_ESPERA_ARRANQUE_TOTAL} segundos</strong> en estar listo
-                            ({SEGUNDOS_CFG_NODE_RED} s de configuración + ~{SEGUNDOS_ARRANQUE_HARDWARE} s
-                            hasta la primera medición). Verás una cuenta atrás en pantalla — es normal que
-                            no se mueva de inmediato.
+                            Las gráficas y la tabla se irán llenando muestra a muestra, hasta un
+                            máximo de {oscilaciones} oscilaciones.
                           </p>
                         </div>
                       </AlertDialogDescription>
@@ -800,8 +902,8 @@ export default function RealtimePage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">Estado de turno:</span>
-                <span className="font-medium text-foreground">
-                  {puedeIniciar ? "Habilitado" : "Fuera de turno"}
+                <span className={`font-medium ${ocupadoPorOtro ? "text-destructive" : "text-foreground"}`}>
+                  {ocupadoPorOtro ? "Ocupado" : puedeIniciar ? "Habilitado" : "Fuera de turno"}
                 </span>
               </div>
             </div>
@@ -822,17 +924,12 @@ export default function RealtimePage() {
               {mensajeComando}
             </p>
           )}
-          {mostrarPanelArranque && faseArranque && (
-            <ArranquePracticaPanel
-              fase={faseArranque}
-              segundosRestantes={segundosRestantesTotal}
-              segundosTotal={SEGUNDOS_ESPERA_ARRANQUE_TOTAL}
-              elapsedSeg={elapsedArranqueSeg}
-              segundosCfg={SEGUNDOS_CFG_NODE_RED}
-              estadoDispositivo={estadoDispositivoLabel}
-            />
+          {ocupadoPorOtro && (
+            <p className="text-xs text-destructive">
+              Ocupado: otro usuario tiene el péndulo en su sesión de 30 minutos. Espera a que termine o reserva otro horario en el calendario.
+            </p>
           )}
-          {!puedeIniciar && (
+          {!puedeIniciar && !ocupadoPorOtro && (
             <p className="text-xs text-amber-600">
               El botón "Iniciar práctica" se habilita durante tu franja reservada (30 min). Puedes repetir
               la práctica las veces que quieras dentro de ese tiempo.
@@ -846,6 +943,20 @@ export default function RealtimePage() {
           )}
         </CardContent>
       </Card>
+
+      {mostrarAvisoReseted && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-foreground">El péndulo sigue en RESET</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {resumenEstudiante(diagnosticoEstudiante)}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {practicaConError && (
         <Card className="border-destructive/50 bg-destructive/5">
@@ -945,40 +1056,72 @@ export default function RealtimePage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Período por muestra</CardTitle>
-            <CardDescription>Evolución del período medido</CardDescription>
+            <CardDescription>
+              Muestras 1 a {maxMuestrasGrafica}, igual que en la tabla de datos
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <MetricChart data={chartData} dataKey="periodo" label="Período (s)" color="var(--chart-1)" />
+            <MetricChart
+              data={chartData}
+              dataKey="periodo"
+              label="Período (s)"
+              color="var(--chart-1)"
+              maxMuestras={maxMuestrasGrafica}
+            />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Gravedad calculada por muestra</CardTitle>
-            <CardDescription>Convergencia hacia el valor promedio</CardDescription>
+            <CardDescription>
+              Muestras 1 a {maxMuestrasGrafica}, igual que en la tabla de datos
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <MetricChart data={chartData} dataKey="gravedad" label="Gravedad" color="var(--chart-2)" />
+            <MetricChart
+              data={chartData}
+              dataKey="gravedad"
+              label="Gravedad"
+              color="var(--chart-2)"
+              maxMuestras={maxMuestrasGrafica}
+            />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Frecuencia por muestra</CardTitle>
-            <CardDescription>Lectura cruda del sensor (no es 1/período)</CardDescription>
+            <CardDescription>
+              Lectura cruda del sensor — muestras 1 a {maxMuestrasGrafica}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <MetricChart data={chartData} dataKey="frecuencia" label="Frecuencia (Hz)" color="var(--chart-3)" />
+            <MetricChart
+              data={chartData}
+              dataKey="frecuencia"
+              label="Frecuencia (Hz)"
+              color="var(--chart-3)"
+              maxMuestras={maxMuestrasGrafica}
+            />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Temperatura por muestra</CardTitle>
-            <CardDescription>Temperatura ambiente durante la práctica</CardDescription>
+            <CardDescription>
+              Temperatura ambiente — muestras 1 a {maxMuestrasGrafica}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <MetricChart data={chartData} dataKey="temperatura" label="Temperatura (°C)" color="var(--chart-4)" />
+            <MetricChart
+              data={chartData}
+              dataKey="temperatura"
+              label="Temperatura (°C)"
+              color="var(--chart-4)"
+              maxMuestras={maxMuestrasGrafica}
+            />
           </CardContent>
         </Card>
       </div>
@@ -989,7 +1132,7 @@ export default function RealtimePage() {
           <CardTitle className="text-lg">Registro de Datos</CardTitle>
           <CardDescription>
             {lecturasTabla.length > 0
-              ? `${lecturasTabla.length} muestras — desplázate hacia abajo para cargar anteriores`
+              ? `${lecturasTabla.length} de ${maxMuestrasGrafica} muestras — se actualiza junto con las gráficas`
               : "Sin muestras en la práctica actual"}
           </CardDescription>
         </CardHeader>
@@ -1023,7 +1166,7 @@ export default function RealtimePage() {
                         <td className="py-3 px-4 font-mono">
                           {millis !== null ? new Date(millis).toLocaleTimeString() : "--"}
                         </td>
-                        <td className="py-3 px-4 font-mono">{l.muestras ?? "--"}</td>
+                        <td className="py-3 px-4 font-mono">{l.muestra ?? "--"}</td>
                         <td className="py-3 px-4 font-mono">{formatNumber(l.periodo, 5)}</td>
                         <td className="py-3 px-4 font-mono">{formatNumber(l.gravedad, 5)}</td>
                         <td className="py-3 px-4 font-mono">{formatNumber(l.frecuencia, 5)}</td>
@@ -1052,156 +1195,21 @@ export default function RealtimePage() {
   )
 }
 
-interface MetricChartPoint {
-  muestra: number
-  [key: string]: number | null
-}
-
-const FASE_ARRANQUE_INFO: Record<
-  FaseArranque,
-  { titulo: string; descripcion: string; tone: "primary" | "chart-3" | "chart-2" | "amber" }
-> = {
-  configurando: {
-    titulo: "Fase 1 — Configurando mecanismo",
-    descripcion: `Enviando oscilaciones y distancia al péndulo. A los ${SEGUNDOS_CFG_NODE_RED} s se enviará la orden de movimiento — todavía es normal que no se mueva.`,
-    tone: "primary",
-  },
-  arrancando: {
-    titulo: "Fase 2 — Iniciando movimiento",
-    descripcion:
-      "La orden de arranque ya se envió. El péndulo se está posicionando y preparando la primera medición — no canceles, casi listo.",
-    tone: "chart-3",
-  },
-  listo: {
-    titulo: "¡Listo! Práctica en vivo",
-    descripcion: "Llegaron las primeras muestras. Puedes seguir los gráficos y valores en tiempo real.",
-    tone: "chart-2",
-  },
-  demora: {
-    titulo: "Tarda más de lo habitual",
-    descripcion:
-      "Pasó el tiempo estimado sin datos nuevos. La práctica puede estar en curso — revisa la cámara o espera unos segundos más antes de cancelar.",
-    tone: "amber",
-  },
-}
-
-function ArranquePracticaPanel({
-  fase,
-  segundosRestantes,
-  segundosTotal,
-  elapsedSeg,
-  segundosCfg,
-  estadoDispositivo,
-}: {
-  fase: FaseArranque
-  segundosRestantes: number
-  segundosTotal: number
-  elapsedSeg: number
-  segundosCfg: number
-  estadoDispositivo: string | null
-}) {
-  const info = FASE_ARRANQUE_INFO[fase]
-  const progreso = fase === "listo" ? 100 : Math.min(100, Math.round((elapsedSeg / segundosTotal) * 100))
-
-  const pasos = [
-    { id: 1, label: "Configuración", done: elapsedSeg >= segundosCfg || fase === "listo" || fase === "arrancando" || fase === "demora", active: fase === "configurando" },
-    { id: 2, label: "Movimiento", done: fase === "listo" || fase === "demora", active: fase === "arrancando" },
-    { id: 3, label: "En vivo", done: fase === "listo", active: false },
-  ]
-
-  const borderClass =
-    fase === "listo"
-      ? "border-chart-2/60 bg-chart-2/5"
-      : fase === "demora"
-        ? "border-amber-500/50 bg-amber-500/5"
-        : "border-primary/40 bg-primary/5"
-
-  return (
-    <div className={`rounded-xl border p-5 space-y-4 ${borderClass}`}>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-1">
-          <p className="text-sm font-semibold text-foreground">{info.titulo}</p>
-          <p className="text-xs text-muted-foreground max-w-xl">{info.descripcion}</p>
-          {estadoDispositivo && (
-            <p className="text-xs text-primary font-medium">{estadoDispositivo}</p>
-          )}
-        </div>
-
-        {fase === "listo" ? (
-          <div className="flex flex-col items-center justify-center min-w-[120px] py-2">
-            <CheckCircle2 className="h-14 w-14 text-chart-2 animate-pulse" />
-            <span className="text-2xl font-bold text-chart-2 mt-1">¡Listo!</span>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center min-w-[120px]">
-            <span className="text-6xl font-bold font-mono tabular-nums leading-none text-foreground">
-              {segundosRestantes}
-            </span>
-            <span className="text-xs text-muted-foreground mt-2 text-center">
-              seg restantes
-              <br />
-              <span className="text-[10px]">(~{segundosTotal} s en total)</span>
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-          <div
-            className={`h-full transition-all duration-500 rounded-full ${
-              fase === "listo" ? "bg-chart-2" : fase === "demora" ? "bg-amber-500" : "bg-primary"
-            }`}
-            style={{ width: `${progreso}%` }}
-          />
-        </div>
-        <div className="flex justify-between gap-2 text-[11px]">
-          {pasos.map((paso) => (
-            <div
-              key={paso.id}
-              className={`flex items-center gap-1.5 ${
-                paso.done
-                  ? "text-chart-2 font-medium"
-                  : paso.active
-                    ? "text-primary font-medium"
-                    : "text-muted-foreground"
-              }`}
-            >
-              {paso.done ? (
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-              ) : paso.active ? (
-                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-              ) : (
-                <span className="h-3.5 w-3.5 rounded-full border border-muted-foreground/40 shrink-0" />
-              )}
-              <span>{paso.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {fase !== "listo" && (
-        <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5 shrink-0" />
-          Es normal que no veas movimiento durante los primeros {segundosCfg} segundos. No canceles
-          hasta que aparezca &quot;¡Listo!&quot; o pasen ~{segundosTotal} s.
-        </p>
-      )}
-    </div>
-  )
-}
-
 function MetricChart({
   data,
   dataKey,
   label,
   color,
+  maxMuestras,
 }: {
   data: MetricChartPoint[]
   dataKey: string
   label: string
   color: string
+  maxMuestras: number
 }) {
+  const ticks = Array.from({ length: maxMuestras }, (_, i) => i + 1)
+
   if (data.length === 0) {
     return (
       <div className="h-[260px] w-full flex items-center justify-center text-sm text-muted-foreground">
@@ -1216,9 +1224,14 @@ function MetricChart({
         <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
           <XAxis
+            type="number"
             dataKey="muestra"
+            domain={[1, maxMuestras]}
+            ticks={ticks}
+            interval={0}
+            allowDecimals={false}
             className="text-xs fill-muted-foreground"
-            tick={{ fill: "var(--muted-foreground)" }}
+            tick={{ fill: "var(--muted-foreground)", fontSize: maxMuestras > 12 ? 10 : 12 }}
             label={{ value: "Muestra", position: "insideBottom", offset: -5, fill: "var(--muted-foreground)" }}
           />
           <YAxis
@@ -1249,3 +1262,4 @@ function MetricChart({
     </div>
   )
 }
+

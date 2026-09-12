@@ -1,0 +1,15 @@
+# Cliente frp en la Raspberry. Copia a /etc/frp/frpc.toml
+# La Pi NO abre puertos de entrada: solo sale hacia la VPS.
+
+serverAddr = "IP_O_DOMINIO_DE_LA_VPS"
+serverPort = 7000
+
+auth.method = "token"
+auth.token = "CAMBIA_ESTE_TOKEN"
+
+[[proxies]]
+name = "camara-mjpeg"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 8080
+remotePort = 8080

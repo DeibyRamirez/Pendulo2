@@ -21,6 +21,7 @@ import {
   UserCog,
   Users,
   Wrench,
+  ClipboardList,
 } from "lucide-react";
 import {
   actualizarEstadoPendulo,
@@ -34,6 +35,10 @@ import {
   escucharUsuarios,
 } from "@/app/services/usuarioService";
 import { escucharTodasReservaciones } from "@/app/services/reservacionService";
+import { DiagnosticoPenduloAdmin } from "@/components/diagnostico-pendulo-admin";
+import { Switch } from "@/components/ui/switch";
+import { useModuloEvaluacion } from "@/hooks/useModuloEvaluacion";
+import { guardarModuloEvaluacion } from "@/lib/moduloEvaluacion";
 
 type Rol = "Estudiante" | "Docente" | "Admin";
 type EstadoPendulo = "Activo" | "Inactivo" | "En_uso" | "En_mantenimiento";
@@ -75,6 +80,8 @@ function toDate(value: Reservacion["inicio_sesion_reserva"]): Date {
 
 export default function DashboardAdminPage() {
   const { user, logout } = useAuth();
+  const { activo: moduloEvaluacion, cargando: cargandoModulo } = useModuloEvaluacion();
+  const [guardandoModulo, setGuardandoModulo] = useState(false);
 
   const [pendulos, setPendulos] = useState<Pendulo[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -146,6 +153,18 @@ export default function DashboardAdminPage() {
       usuarioMasActivo: topUser?.nombre || topUser?.email || "Sin datos",
     };
   }, [pendulos, usuarios, reservaciones]);
+
+  const alCambiarModuloEvaluacion = async (encendido: boolean) => {
+    setError(null);
+    setGuardandoModulo(true);
+    try {
+      await guardarModuloEvaluacion(encendido);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar el módulo de evaluación");
+    } finally {
+      setGuardandoModulo(false);
+    }
+  };
 
   const handleCrearPendulo = async () => {
     setError(null);
@@ -247,6 +266,42 @@ export default function DashboardAdminPage() {
               {error}
             </div>
           )}
+
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5" />
+                Módulo de evaluación
+              </CardTitle>
+              <CardDescription>
+                Plus de grupos, cuestionarios y Excel de entregas. Apagado no se muestra a docentes ni estudiantes. El Excel de muestras, los decimales y los gráficos de cada práctica siguen visibles.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {moduloEvaluacion ? "Módulo encendido" : "Módulo apagado"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {cargandoModulo ? "Leyendo configuración…" : "El cambio aplica en vivo, sin redeploy."}
+                </p>
+              </div>
+              <Switch
+                checked={moduloEvaluacion}
+                disabled={cargandoModulo || guardandoModulo}
+                onCheckedChange={alCambiarModuloEvaluacion}
+                aria-label="Activar módulo de evaluación"
+              />
+            </CardContent>
+          </Card>
+
+          <DiagnosticoPenduloAdmin
+            pendulos={pendulos.map((p) => ({
+              id: p.id,
+              pendulo_id: p.pendulo_id,
+              institucion: p.institucion,
+            }))}
+          />
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Péndulos</p><p className="text-2xl font-bold">{stats.totalPendulos}</p></CardContent></Card>

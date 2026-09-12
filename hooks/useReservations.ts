@@ -20,6 +20,8 @@ export interface Reservacion {
   estado: EstadoReservacion;
   institucion: string;
   pendulo_id: string;
+  practica_id?: string;
+  practicas_realizadas?: number;
 }
 
 export interface CrearReservacionInput {

@@ -37,12 +37,16 @@ export interface PenduloEnVivo {
   ultimoTopico?: string;
   ultimoRaw?: string;
   actualizadoEn?: Timestamp;
+  medicionInvalida?: boolean;
+  estadoFirmware?: string;
+  idAparato?: string;
   [key: string]: unknown;
 }
 
 export interface LecturaPendulo {
   id: string;
   muestras?: number;
+  muestra?: number;
   periodo?: number;
   gravedad?: number;
   frecuencia?: number;
@@ -86,7 +90,7 @@ export function usePenduloData(
   penduloId: string,
   options: UsePenduloDataOptions = {},
 ): UsePenduloDataResult {
-  const { cantidadLecturas = 10, uid = null, practicaInicio = null } = options;
+  const { cantidadLecturas = 20, uid = null, practicaInicio = null } = options;
 
   const [enVivo, setEnVivo] = useState<PenduloEnVivo | null>(null);
   const [lecturas, setLecturas] = useState<LecturaPendulo[]>([]);

@@ -35,9 +35,11 @@ const MONTHS = [
 ]
 const TIME_SLOTS = [
   "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
-  "11:00", "11:30", "12:00", "12:30", "14:00", "14:30",
-  "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
-  //"18:00", "18:30", "19:00", "19:30", "20:00", "20:30"
+  "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
+  "14:00", "14:30", "15:00", "15:30", "16:00", "16:30",
+  "17:00", "17:30", "18:00", "18:30", "19:00", "19:30",
+  "20:00", "20:30", "21:00", "21:30", "22:00", "22:30",
+  "23:00", "23:30", "24:00"
 ]
 const PENDULO_ID = "UAC-01"
 
@@ -435,7 +437,7 @@ export default function ReservasPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="h-3 w-3 rounded bg-red-500/20" />
-                        <span className="text-muted-foreground">Horario ocupado</span>
+                        <span className="text-muted-foreground">Ocupado por otro usuario</span>
                       </div>
                     </>
                   )}
@@ -457,6 +459,10 @@ export default function ReservasPage() {
                 </CardHeader>
                 <CardContent>
                   {selectedDate ? (
+                    <>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      El rojo indica un espacio ocupado por otro usuario (30 minutos). Elige solo un horario libre.
+                    </p>
                     <div className="grid grid-cols-3 gap-2">
                       {TIME_SLOTS.map((time) => {
                         const booked = isSlotBooked(time)
@@ -467,22 +473,35 @@ export default function ReservasPage() {
                             key={time}
                             disabled={booked}
                             onClick={() => setSelectedTime(time)}
+                            title={
+                              booked
+                                ? ownerType === "mine"
+                                  ? "Esta franja es tuya"
+                                  : "Ocupado por otro usuario"
+                                : "Horario disponible"
+                            }
                             className={`
-                              py-2 px-3 rounded-lg text-sm font-medium transition-colors
+                              py-2 px-3 rounded-lg text-sm font-medium transition-colors leading-tight
                               ${booked
                                 ? ownerType === "mine"
-                                  ? "bg-primary/25 text-primary cursor-not-allowed line-through"
-                                  : "bg-red-500/20 text-red-700 cursor-not-allowed line-through"
+                                  ? "bg-primary/25 text-primary cursor-not-allowed"
+                                  : "bg-red-500/20 text-red-700 cursor-not-allowed"
                                 : selected
                                 ? "bg-primary text-primary-foreground"
                                 : "bg-muted/50 hover:bg-muted text-foreground"}
                             `}
                           >
-                            {time}
+                            <span className="block">{time}</span>
+                            {booked ? (
+                              <span className="block text-[10px] font-normal opacity-80">
+                                {ownerType === "mine" ? "Tuya" : "Ocupado"}
+                              </span>
+                            ) : null}
                           </button>
                         )
                       })}
                     </div>
+                    </>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -537,6 +556,7 @@ export default function ReservasPage() {
                       <p className="font-medium text-foreground mb-1">Información importante</p>
                       <ul className="space-y-1">
                         <li>Cada sesión tiene una duración de 30 minutos</li>
+                        <li>Un horario en rojo está ocupado por otro usuario; no se puede reservar</li>
                         <li>Puedes cancelar hasta 2 horas antes</li>
                         <li>El acceso remoto se habilita 5 minutos antes</li>
                       </ul>

@@ -144,8 +144,62 @@ export async function obtenerLecturasPorSesion(penduloId, uid, inicio, fin) {
 }
 
 /**
- * Listar UIDs con prácticas registradas en un péndulo (para export admin).
+ * Listar prácticas de un usuario (agrupa lecturas por practicaId).
  */
+export async function listarPracticasUsuario(penduloId, uid) {
+  const lecturas = await obtenerLecturasPractica(penduloId, uid);
+  const porPractica = new Map();
+
+  lecturas.forEach((lectura) => {
+    const practicaId = lectura.practicaId || 'sin_practica';
+    if (!porPractica.has(practicaId)) {
+      porPractica.set(practicaId, []);
+    }
+    porPractica.get(practicaId).push(lectura);
+  });
+
+  return [...porPractica.entries()]
+    .map(([practicaId, filas]) => {
+      const ordenadas = [...filas].sort((a, b) => {
+        const ta = a.timestamp?.toMillis?.() ?? 0;
+        const tb = b.timestamp?.toMillis?.() ?? 0;
+        return ta - tb;
+      });
+      return {
+        practicaId,
+        penduloId,
+        lecturas: ordenadas,
+        inicio: ordenadas[0]?.timestamp ?? null,
+        fin: ordenadas[ordenadas.length - 1]?.timestamp ?? null,
+        muestras: ordenadas.length,
+      };
+    })
+    .sort((a, b) => {
+      const ta = a.inicio?.toMillis?.() ?? 0;
+      const tb = b.inicio?.toMillis?.() ?? 0;
+      return tb - ta;
+    });
+}
+
+/**
+ * Lista las prácticas de un usuario en uno o varios péndulos.
+ */
+export async function listarPracticasDeUsuario(uid, penduloIds) {
+  const ids = [...new Set((penduloIds || []).filter(Boolean))];
+  const todas = [];
+
+  for (const penduloId of ids) {
+    const practicas = await listarPracticasUsuario(penduloId, uid);
+    todas.push(...practicas);
+  }
+
+  return todas.sort((a, b) => {
+    const ta = a.inicio?.toMillis?.() ?? 0;
+    const tb = b.inicio?.toMillis?.() ?? 0;
+    return tb - ta;
+  });
+}
+
 export async function listarUsuariosConPracticas(penduloId) {
   const snapshot = await getDocs(collection(db, 'pendulo_data', penduloId, 'practicas'));
   return snapshot.docs.map((d) => d.id);
@@ -162,6 +216,33 @@ export function escucharLecturasRecientes(penduloId, cantidad, callback, onError
     cantidad,
     callback,
     onError,
+  );
+}
+
+/**
+ * Últimos comandos (Admin). Ordenados por fecha; el índice de
+ * fechaCreacion es automático.
+ */
+export function escucharComandosRecientes(cantidad, callback, onError) {
+  const q = query(
+    collection(db, 'pendulo_comandos'),
+    orderBy('fechaCreacion', 'desc'),
+    limit(cantidad),
+  );
+
+  return onSnapshot(
+    q,
+    (querySnapshot) => {
+      const comandos = [];
+      querySnapshot.forEach((docSnap) => {
+        comandos.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      callback(comandos);
+    },
+    (error) => {
+      console.error('Error al escuchar comandos recientes:', error);
+      if (onError) onError(error);
+    },
   );
 }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,142 +10,177 @@ import {
   Maximize2,
   Minimize2,
   Camera,
-  Settings,
-  Volume2,
-  VolumeX
+  RefreshCw,
+  X,
 } from "lucide-react"
+import { ReproductorWebrtcCamara } from "@/components/reproductor-webrtc-camara"
+import {
+  construirUrlMjpeg,
+  construirUrlWhep,
+  obtenerProtocoloCamara,
+  obtenerUrlBaseCamara,
+  textoAyudaSinSenal,
+  textoPieCamara,
+} from "@/lib/camaraEnVivo"
+
+type EstadoConexionCamara = "conectando" | "conectado" | "sin_senal"
 
 interface CameraStreamProps {
   penduloId?: string
   isLive?: boolean
 }
 
-export function CameraStream({ penduloId = "UAC-01", isLive = true }: CameraStreamProps) {
-  const [isPlaying, setIsPlaying] = useState(true)
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [isMuted, setIsMuted] = useState(true)
-  const [connectionStatus, setConnectionStatus] = useState<"connected" | "connecting" | "disconnected">("connected")
+export function CameraStream({ penduloId = "UAC-01" }: CameraStreamProps) {
+  const urlBase = useMemo(() => obtenerUrlBaseCamara(), [])
+  const protocolo = useMemo(() => obtenerProtocoloCamara(), [])
+  const [reproduciendo, setReproduciendo] = useState(true)
+  const [pantallaCompleta, setPantallaCompleta] = useState(false)
+  const [reintento, setReintento] = useState(0)
+  const [estadoConexion, setEstadoConexion] = useState<EstadoConexionCamara>("conectando")
 
-  // Simular reconexión
+  const urlMjpeg = construirUrlMjpeg(urlBase, reintento)
+  const urlWhep = useMemo(() => construirUrlWhep(urlBase), [urlBase])
+  const ayudaSinSenal = useMemo(
+    () => textoAyudaSinSenal(urlBase, protocolo),
+    [urlBase, protocolo]
+  )
+  const pieCamara = useMemo(
+    () => textoPieCamara(urlBase, protocolo),
+    [urlBase, protocolo]
+  )
+
+  const marcarConectado = useCallback(() => setEstadoConexion("conectado"), [])
+  const marcarSinSenal = useCallback(() => setEstadoConexion("sin_senal"), [])
+
   useEffect(() => {
-    if (!isPlaying) {
-      setConnectionStatus("disconnected")
-    } else {
-      setConnectionStatus("connecting")
-      const timer = setTimeout(() => {
-        setConnectionStatus("connected")
-      }, 1000)
-      return () => clearTimeout(timer)
+    if (!pantallaCompleta) return
+    const alPulsarTecla = (evento: KeyboardEvent) => {
+      if (evento.key === "Escape") setPantallaCompleta(false)
     }
-  }, [isPlaying])
+    window.addEventListener("keydown", alPulsarTecla)
+    return () => window.removeEventListener("keydown", alPulsarTecla)
+  }, [pantallaCompleta])
 
-  const getStatusColor = () => {
-    switch (connectionStatus) {
-      case "connected":
-        return "bg-green-500"
-      case "connecting":
-        return "bg-yellow-500 animate-pulse"
-      case "disconnected":
-        return "bg-red-500"
-    }
-  }
+  const colorEstado =
+    estadoConexion === "conectado"
+      ? "bg-green-500"
+      : estadoConexion === "conectando"
+        ? "bg-yellow-500 animate-pulse"
+        : "bg-red-500"
 
-  const getStatusText = () => {
-    switch (connectionStatus) {
-      case "connected":
-        return "EN VIVO"
-      case "connecting":
-        return "CONECTANDO..."
-      case "disconnected":
-        return "DESCONECTADO"
-    }
-  }
+  const textoEstado =
+    estadoConexion === "conectado"
+      ? "EN VIVO"
+      : estadoConexion === "conectando"
+        ? "CONECTANDO..."
+        : "SIN SEÑAL"
+
+  const mostrarStream = reproduciendo && estadoConexion !== "sin_senal"
+
+  const salirPantallaCompleta = () => setPantallaCompleta(false)
 
   return (
-    <Card className={`border-border/50 ${isFullscreen ? "fixed inset-4 z-50" : ""}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+    <Card
+      className={
+        pantallaCompleta
+          ? "fixed inset-0 z-50 flex flex-col rounded-none border-0 bg-background"
+          : "border-border/50"
+      }
+    >
+      <CardHeader className="pb-3 shrink-0">
+        <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Camera className="w-5 h-5 text-primary" />
-            Cámara del Péndulo
+            Visualización en vivo
           </CardTitle>
-          <Badge variant="outline" className="text-xs">
-            <div className={`w-2 h-2 rounded-full mr-2 ${getStatusColor()}`} />
-            {getStatusText()}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              <span className={`w-2 h-2 rounded-full mr-2 ${colorEstado}`} />
+              {textoEstado}
+            </Badge>
+            {pantallaCompleta && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={salirPantallaCompleta}
+                aria-label="Cerrar pantalla completa"
+              >
+                <X className="w-4 h-4 mr-1" />
+                Cerrar
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="relative aspect-video bg-secondary/30 rounded-lg overflow-hidden border border-border">
-          {/* Video placeholder - En producción conectar a stream real */}
-          {isPlaying && connectionStatus === "connected" ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              {/* Simulación visual del péndulo */}
-              <div className="relative w-full h-full">
-                {/* Fondo de laboratorio */}
-                <div className="absolute inset-0 bg-gradient-to-b from-secondary/50 to-secondary/80" />
-                
-                {/* Grid de fondo */}
-                <div 
-                  className="absolute inset-0 opacity-10"
-                  style={{
-                    backgroundImage: `
-                      linear-gradient(to right, hsl(var(--foreground)) 1px, transparent 1px),
-                      linear-gradient(to bottom, hsl(var(--foreground)) 1px, transparent 1px)
-                    `,
-                    backgroundSize: "40px 40px"
-                  }}
-                />
-                
-                {/* Estructura del péndulo */}
-                <div className="absolute top-8 left-1/2 -translate-x-1/2">
-                  {/* Soporte */}
-                  <div className="w-48 h-3 bg-muted-foreground rounded" />
-                  
-                  {/* Péndulo animado */}
-                  <div 
-                    className="relative"
-                    style={{
-                      transformOrigin: "center top",
-                      animation: "pendulum 2s ease-in-out infinite"
-                    }}
-                  >
-                    {/* Hilo */}
-                    <div className="w-0.5 h-40 bg-muted-foreground mx-auto" />
-                    
-                    {/* Esfera */}
-                    <div className="w-10 h-10 rounded-full bg-primary mx-auto -mt-1 shadow-lg shadow-primary/30" />
-                  </div>
-                </div>
-                
-                {/* Indicadores de medición */}
-                <div className="absolute bottom-4 left-4 right-4 flex justify-between text-xs text-muted-foreground font-mono">
-                  <span>Cam: {penduloId}</span>
-                  <span>{new Date().toLocaleTimeString()}</span>
-                  <span>1080p @ 30fps</span>
-                </div>
-              </div>
-              
-              {/* Estilo de animación */}
-              <style jsx>{`
-                @keyframes pendulum {
-                  0%, 100% { transform: rotate(-15deg); }
-                  50% { transform: rotate(15deg); }
-                }
-              `}</style>
-            </div>
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
+      <CardContent className={pantallaCompleta ? "flex-1 min-h-0 flex flex-col" : ""}>
+        <div
+          className={
+            pantallaCompleta
+              ? "relative flex-1 min-h-0 rounded-lg overflow-hidden border border-border bg-black"
+              : "relative aspect-video bg-secondary/30 rounded-lg overflow-hidden border border-border"
+          }
+        >
+          {reproduciendo && protocolo === "mjpeg" ? (
+            <img
+              key={urlMjpeg}
+              src={urlMjpeg}
+              alt={`Transmisión en vivo de la cámara del péndulo ${penduloId}`}
+              className={`absolute inset-0 h-full w-full object-contain bg-black ${
+                mostrarStream ? "opacity-100" : "opacity-0"
+              }`}
+              onLoad={marcarConectado}
+              onError={marcarSinSenal}
+            />
+          ) : null}
+
+          {reproduciendo && protocolo === "webrtc" ? (
+            <ReproductorWebrtcCamara
+              key={`${urlWhep}-${reintento}`}
+              urlWhep={urlWhep}
+              reintento={reintento}
+              penduloId={penduloId}
+              visible={mostrarStream}
+              alConectar={marcarConectado}
+              alError={marcarSinSenal}
+            />
+          ) : null}
+
+          {(!reproduciendo || estadoConexion === "sin_senal") && (
+            <div className="absolute inset-0 flex items-center justify-center p-6">
+              <div className="text-center max-w-md">
                 <VideoOff className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  {connectionStatus === "connecting" ? "Conectando a la cámara..." : "Transmisión pausada"}
+                <p className="text-foreground font-medium mb-1">
+                  {reproduciendo ? "Sin señal de cámara" : "Transmisión pausada"}
                 </p>
+                <p className="text-muted-foreground text-sm">{ayudaSinSenal}</p>
               </div>
             </div>
           )}
-          
-          {/* Controles de video */}
+
+          {estadoConexion === "conectando" && reproduciendo && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <p className="text-sm text-muted-foreground">Conectando a la cámara...</p>
+            </div>
+          )}
+
+          <div className="absolute top-3 left-3 text-[11px] font-mono text-white/80 drop-shadow">
+            Cam: {penduloId}
+          </div>
+
+          {pantallaCompleta && (
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              className="absolute top-3 right-3 z-10 h-10 w-10 rounded-full shadow-lg"
+              onClick={salirPantallaCompleta}
+              aria-label="Cerrar pantalla completa"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          )}
+
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -153,55 +188,50 @@ export function CameraStream({ penduloId = "UAC-01", isLive = true }: CameraStre
                   size="icon"
                   variant="ghost"
                   className="h-8 w-8 text-white hover:bg-white/20"
-                  onClick={() => setIsPlaying(!isPlaying)}
+                  onClick={() => {
+                    setReproduciendo((prev) => !prev)
+                    if (!reproduciendo) {
+                      setEstadoConexion("conectando")
+                    }
+                  }}
+                  aria-label={reproduciendo ? "Pausar transmisión" : "Reanudar transmisión"}
                 >
-                  {isPlaying ? (
-                    <Video className="w-4 h-4" />
-                  ) : (
-                    <VideoOff className="w-4 h-4" />
-                  )}
+                  {reproduciendo ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
                 </Button>
                 <Button
                   size="icon"
                   variant="ghost"
                   className="h-8 w-8 text-white hover:bg-white/20"
-                  onClick={() => setIsMuted(!isMuted)}
+                  onClick={() => {
+                    setEstadoConexion("conectando")
+                    setReproduciendo(true)
+                    setReintento((n) => n + 1)
+                  }}
+                  aria-label="Reintentar conexión de cámara"
                 >
-                  {isMuted ? (
-                    <VolumeX className="w-4 h-4" />
-                  ) : (
-                    <Volume2 className="w-4 h-4" />
-                  )}
+                  <RefreshCw className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-white hover:bg-white/20"
-                >
-                  <Settings className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-white hover:bg-white/20"
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                >
-                  {isFullscreen ? (
-                    <Minimize2 className="w-4 h-4" />
-                  ) : (
-                    <Maximize2 className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-white hover:bg-white/20"
+                onClick={() => setPantallaCompleta((prev) => !prev)}
+                aria-label={pantallaCompleta ? "Salir de pantalla completa" : "Ver en pantalla completa"}
+              >
+                {pantallaCompleta ? (
+                  <Minimize2 className="w-4 h-4" />
+                ) : (
+                  <Maximize2 className="w-4 h-4" />
+                )}
+              </Button>
             </div>
           </div>
         </div>
-        
-        <p className="text-xs text-muted-foreground mt-3 text-center">
-          Transmisión en tiempo real desde el Laboratorio de Física - UAC
-        </p>
+
+        {!pantallaCompleta && (
+          <p className="text-xs text-muted-foreground mt-3 text-center">{pieCamara}</p>
+        )}
       </CardContent>
     </Card>
   )

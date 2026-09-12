@@ -73,11 +73,24 @@ nodos a Node-RED — ver `bridge/node-red-estado-flow.json` y la sección 5 de
 ### `pendulo/estado` (propuesto) — señales de control
 
 Texto plano, uno de: `CFGOK` | `STR` | `STROK` | `DAT` | `END` | variantes
-con `STOP`. El bridge (`tryParseControlSignal` en
-`bridge/src/parsePayload.js`) ya sabe reconocer estas señales **en
-cualquier tópico** bajo `pendulo/#`, no solo en `pendulo/estado` — así que
-funciona apenas Node-RED empiece a publicarlas, sin tener que tocar el
-código del bridge otra vez.
+con `STOP`, más el latido del firmware:
+
+```
+IDS→WPH→RESETED    dsPic en RESET (esperando cfg/str)
+IDS→WPH→STOPED     idle sano tras END
+IDS→WPH→STARTED    práctica en curso
+ERR1 / ERR 1       láser / fotocompuerta
+ERR2 / ERR 2       microswitch
+```
+
+Para que la web/Admin vean `RESETED`/`STOPED`, Node-RED debe reenviar las
+líneas de `debug 14` a MQTT (un `mqtt out` al tópico `pendulo/estado` desde
+el mismo cable que alimenta ese debug). El bridge las reconoce **en
+cualquier tópico** bajo `pendulo/#`.
+
+El parser también marca `medicionInvalida: true` si el período sale de
+~1.5–4.0 s o la gravedad de ~8–12 m/s² (fotocompuerta en falso; no aborta
+la práctica).
 
 ### `pendulo/promedio` (propuesto, opcional) — promedio acumulado
 

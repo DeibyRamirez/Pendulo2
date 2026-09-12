@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LogIn, QrCode } from "lucide-react";
 import Link from "next/link";
 import { PendulumChart } from "@/components/pendulum-chart";
+import { CameraStream } from "@/components/camera-stream";
 
 export default function PublicPendulumPage() {
   const [qrCode, setQrCode] = useState<string>("");
@@ -91,6 +92,10 @@ export default function PublicPendulumPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <div className="mt-6">
+              <CameraStream penduloId="UAC-01" />
+            </div>
 
             {/* Información del Péndulo */}
             <Card className="border-border/50 mt-6">

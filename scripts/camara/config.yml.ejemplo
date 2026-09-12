@@ -1,0 +1,15 @@
+# Copia a /etc/cloudflared/config.yml SOLO si el conector no usa token
+# del dashboard, o como referencia del hostname.
+#
+# Con `cloudflared service install <token>` Cloudflare suele gestionar
+# el origen desde Zero Trust. Este archivo sirve para forzar HTTP/2
+# (campus que bloquea QUIC/UDP 7844) y documentar el destino.
+#
+# No pongas la IP 10.10.161.61 aquí. El origen es localhost.
+
+protocol: http2
+
+ingress:
+  - hostname: camarapendulo.cheiviz.com
+    service: http://127.0.0.1:8080
+  - service: http_status:404

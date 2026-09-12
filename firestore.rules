@@ -68,11 +68,19 @@ service cloud.firestore {
     }
 
     // ─── Usuarios ──────────────────────────────────────────────────────────
+    // Google a veces no trae email en el token JWT; el uid de Auth sí es fiable.
+    function correoCoincideConAuth() {
+      return request.auth.token.email == null
+        || request.resource.data.email == request.auth.token.email;
+    }
+
     match /usuarios/{uid} {
       allow create: if isSignedIn()
         && request.auth.uid == uid
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 0
+        && correoCoincideConAuth()
         && validRole(request.resource.data.rol)
         && request.resource.data.rol == "Estudiante"
         && request.resource.data.estado == "active";
@@ -80,11 +88,22 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && (request.auth.uid == uid || isDocenteOrAdmin());
 
-      allow update: if isAdmin()
-        && request.resource.data.uid == resource.data.uid
-        && request.resource.data.email == resource.data.email
-        && validRole(request.resource.data.rol)
-        && validUserEstado(request.resource.data.estado);
+      allow update: if isSignedIn() && (
+        (
+          isAdmin()
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && validRole(request.resource.data.rol)
+          && validUserEstado(request.resource.data.estado)
+        )
+        || (
+          request.auth.uid == uid
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.rol == resource.data.rol
+          && request.resource.data.estado == resource.data.estado
+        )
+      );
 
       allow delete: if false;
     }
@@ -179,10 +198,11 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // Lecturas por usuario/práctica.
+      // Lecturas de la práctica en curso: la ficha pública las grafica.
+      // Solo la del usuario activo; el historial ajeno sigue restringido.
       match /practicas/{uid}/lecturas/{lecturaId} {
-        allow read: if isSignedIn()
-          && (request.auth.uid == uid || isDocenteOrAdmin());
+        allow read: if penduloDataDoc(penduloId).data.usuarioActivo == uid
+          || (isSignedIn() && (request.auth.uid == uid || isDocenteOrAdmin()));
         allow write: if false;
       }
 
@@ -207,6 +227,123 @@ service cloud.firestore {
         && hasPenduloControl(request.resource.data.penduloId);
 
       allow update, delete: if false;
+    }
+
+    function grupoDoc(grupoId) {
+      return get(/databases/$(database)/documents/grupos/$(grupoId));
+    }
+
+    function esDuenioGrupo(grupoId) {
+      return isSignedIn() && grupoDoc(grupoId).data.docente_id == request.auth.uid;
+    }
+
+    function esMiembroGrupo(grupoId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/grupos/$(grupoId)/miembros/$(request.auth.uid));
+    }
+
+    function asignacionDoc(asignacionId) {
+      return get(/databases/$(database)/documents/asignaciones/$(asignacionId));
+    }
+
+    // ─── Grupos de trabajo del docente ─────────────────────────────────────
+    match /grupos/{grupoId} {
+      allow read: if isSignedIn()
+        && (resource.data.docente_id == request.auth.uid || esMiembroGrupo(grupoId) || isAdmin());
+
+      allow create: if isDocente()
+        && request.resource.data.docente_id == request.auth.uid
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 80;
+
+      allow update, delete: if isDocente()
+        && resource.data.docente_id == request.auth.uid;
+
+      match /miembros/{memberUid} {
+        allow read: if isSignedIn()
+          && (
+            esDuenioGrupo(grupoId)
+            || request.auth.uid == memberUid
+            || isAdmin()
+          );
+
+        allow create, delete: if isDocente() && esDuenioGrupo(grupoId);
+        allow update: if false;
+      }
+    }
+
+    match /{path=**}/miembros/{memberId} {
+      allow read: if isSignedIn()
+        && (request.auth.uid == resource.data.uid || isDocenteOrAdmin());
+    }
+
+    // ─── Asignaciones y entregas ─────────────────────────────────────────
+    match /asignaciones/{asignacionId} {
+      allow read: if isSignedIn()
+        && (
+          resource.data.docente_id == request.auth.uid
+          || esMiembroGrupo(resource.data.grupo_id)
+          || isAdmin()
+        );
+
+      allow create: if isDocente()
+        && request.resource.data.docente_id == request.auth.uid
+        && request.resource.data.grupo_id is string
+        && esDuenioGrupo(request.resource.data.grupo_id);
+
+      allow update, delete: if isDocente()
+        && resource.data.docente_id == request.auth.uid;
+
+      match /entregas/{uid} {
+        allow read: if isSignedIn()
+          && (
+            request.auth.uid == uid
+            || asignacionDoc(asignacionId).data.docente_id == request.auth.uid
+            || isAdmin()
+          );
+
+        allow create: if isSignedIn()
+          && request.auth.uid == uid
+          && esMiembroGrupo(asignacionDoc(asignacionId).data.grupo_id)
+          && request.resource.data.practica_id is string
+          && request.resource.data.practica_id.size() > 0
+          && (!('calificacion' in request.resource.data)
+            || request.resource.data.calificacion == null)
+          && (
+            !(asignacionDoc(asignacionId).data.fecha_limite is timestamp)
+            || asignacionDoc(asignacionId).data.fecha_limite >= request.time
+          );
+
+        allow update: if isSignedIn() && (
+          (
+            isDocente()
+            && asignacionDoc(asignacionId).data.docente_id == request.auth.uid
+          )
+          || (
+            request.auth.uid == uid
+            && request.resource.data.calificacion == resource.data.calificacion
+            && (
+              !(asignacionDoc(asignacionId).data.fecha_limite is timestamp)
+              || asignacionDoc(asignacionId).data.fecha_limite >= request.time
+            )
+          )
+        );
+
+        allow delete: if isDocente()
+          && asignacionDoc(asignacionId).data.docente_id == request.auth.uid;
+      }
+    }
+
+    // ─── Configuración de la plataforma (plus de evaluación) ─────────────
+    match /configuracion/{docId} {
+      allow read: if isSignedIn();
+
+      allow create, update: if isAdmin()
+        && docId == "app"
+        && request.resource.data.modulo_evaluacion is bool;
+
+      allow delete: if false;
     }
 
     // ─── Catch-all: denegar todo lo demás ─────────────────────────────────

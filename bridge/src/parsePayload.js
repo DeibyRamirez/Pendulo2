@@ -66,19 +66,61 @@ const ERROR_MESSAGES = {
 };
 
 /**
- * Intenta reconocer un mensaje de error de texto plano, ej. "ERROR 1",
- * "error:2", "err1". Formato exacto sin confirmar todavía con
- * mosquitto_sub; ajustar el regex en cuanto se confirme.
+ * Período (s) y g (m/s²) plausibles para un péndulo de ~2,7 m.
+ * Fuera de rango = fotocompuerta en falso, no aborta la práctica.
  */
+const PERIODO_MIN_S = 1.5;
+const PERIODO_MAX_S = 4.0;
+const GRAVEDAD_MIN = 8;
+const GRAVEDAD_MAX = 12;
+
+function esMedicionInvalida(periodo, gravedad) {
+  if (typeof periodo === 'number' && !Number.isNaN(periodo)) {
+    if (periodo < PERIODO_MIN_S || periodo > PERIODO_MAX_S) return true;
+  }
+  if (typeof gravedad === 'number' && !Number.isNaN(gravedad)) {
+    if (gravedad < GRAVEDAD_MIN || gravedad > GRAVEDAD_MAX) return true;
+  }
+  return false;
+}
+
 function tryParseErrorCode(trimmed) {
-  const match = /^err(?:or)?\s*[:=]?\s*([12])$/i.exec(trimmed);
+  const match = /^err(?:or)?\s*[:=]?\s*([12])\b/i.exec(trimmed);
   if (!match) return null;
   const codigo = Number(match[1]);
   return {
     estado: 'error',
     errorCodigo: codigo,
     errorMensaje: ERROR_MESSAGES[codigo] || `Error ${codigo} desconocido`,
+    estadoDispositivo: codigo === 2 ? 'error_microswitch' : 'error_laser',
+    estadoFirmware: codigo === 2 ? 'ERR2' : 'ERR1',
   };
+}
+
+/**
+ * Latido ids del firmware: "IDS→WPH→RESETED", "IDS WPH STOPED", etc.
+ * Debe evaluarse ANTES del catch-all /stop/i (STOPED lo activaría).
+ */
+function tryParseIdsFirmware(trimmed) {
+  const match =
+    /^ids[\s\u2192+\->]+(\S+?)[\s\u2192+\->]+(reseted|stoped|stopped|started|reset)\s*$/i.exec(
+      trimmed,
+    );
+  if (!match) return null;
+
+  const idAparato = match[1];
+  const token = match[2].toUpperCase();
+  let estadoFirmware = 'STOPED';
+  let estadoDispositivo = 'detenido';
+  if (token === 'RESETED' || token === 'RESET') {
+    estadoFirmware = 'RESETED';
+    estadoDispositivo = 'reseted';
+  } else if (token === 'STARTED') {
+    estadoFirmware = 'STARTED';
+    estadoDispositivo = 'iniciado';
+  }
+
+  return { estadoDispositivo, estadoFirmware, idAparato };
 }
 
 /**
@@ -102,12 +144,13 @@ function tryParseErrorCode(trimmed) {
  */
 const CONTROL_SIGNALS = [
   {
-    // "CFG+5+5" -> confirma (eco) los parametros de configuracion recibidos
-    regex: /^cfg\+(\d+(?:\.\d+)?)\+(\d+(?:\.\d+)?)$/i,
+    // "CFG+5+5" o "CFG→5→5" -> eco de configuracion recibida
+    regex: /^cfg[\s\u2192+]+(\d+(?:\.\d+)?)[\s\u2192+]+(\d+(?:\.\d+)?)$/i,
     build: (m) => ({
       estadoDispositivo: 'configurando',
-      oscilacionesConfirmadas: Number(m[1]),
-      distanciaMuroConfirmada: Number(m[2]),
+      // Firmware: CFG+distancia+oscilaciones (el 2.º número es N de muestras).
+      distanciaMuroConfirmada: Number(m[1]),
+      oscilacionesConfirmadas: Number(m[2]),
     }),
   },
   { regex: /^cfgok$/i, build: () => ({ estadoDispositivo: 'configurado' }) },
@@ -129,6 +172,9 @@ const CONTROL_SIGNALS = [
 ];
 
 function tryParseControlSignal(trimmed) {
+  const idsFields = tryParseIdsFirmware(trimmed);
+  if (idsFields) return idsFields;
+
   for (const { regex, build } of CONTROL_SIGNALS) {
     const match = regex.exec(trimmed);
     if (match) return build(match);
@@ -276,6 +322,16 @@ function parsePayload(topic, message) {
   const parsedRaw =
     tryParseJson(raw) || tryParseKeyValuePairs(raw) || fallbackFieldFromTopic(topicSegments, raw);
   const parsed = enrichErrorField(parsedRaw);
+  const isSample = hasSampleData(parsed);
+
+  // No pone estado:"error" de práctica: el handshake sigue; Admin ve el flag.
+  if (isSample) {
+    parsed.medicionInvalida = esMedicionInvalida(parsed.periodo, parsed.gravedad);
+    if (parsed.medicionInvalida) {
+      parsed.errorMensaje =
+        'Período o gravedad fuera de rango físico (láser/fotocompuerta, no calibración de longitud).';
+    }
+  }
 
   return {
     penduloId,
@@ -283,7 +339,7 @@ function parsePayload(topic, message) {
     raw,
     topic,
     isEndSignal: false,
-    isSample: hasSampleData(parsed),
+    isSample,
     isError: parsed.estado === 'error',
   };
 }
@@ -294,4 +350,6 @@ module.exports = {
   hasSampleData,
   ERROR_MESSAGES,
   tryParseControlSignal,
+  tryParseIdsFirmware,
+  esMedicionInvalida,
 };

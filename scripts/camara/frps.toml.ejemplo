@@ -1,0 +1,15 @@
+# Servidor frp en la VPS (fallback si el campus bloquea Tailscale/Cloudflare).
+# Copiar a /etc/frp/frps.toml y arrancar como systemd.
+# La Pi solo abre una conexión SALIENTE hacia bindPort.
+
+bindPort = 7000
+# El proxy de cámara queda solo en localhost; Caddy es quien publica 443.
+proxyBindAddr = "127.0.0.1"
+
+# Cambia este token. El mismo valor va en frpc.toml de la Raspberry.
+auth.method = "token"
+auth.token = "CAMBIA_ESTE_TOKEN"
+
+# Logs
+log.to = "/var/log/frps.log"
+log.level = "info"
