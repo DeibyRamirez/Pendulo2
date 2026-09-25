@@ -89,6 +89,24 @@ armado por `scp`, en vez de instalar en el destino final.
   importado pero no confirmado conectado al cable real del serial —
   mejora opcional, no bloqueante.
 
+## Actualización: loop automático (modo prueba manual)
+
+Cuando la web incluye el **loop automático** para docente/admin (cfg 15/15
+cada 15 min), hay que **re-desplegar el bridge** en la Pi con los archivos
+nuevos (`manualTestLoop.js`, `parametrosFirmwarePendulo.js`, cambios en
+`index.js` y `config.js`).
+
+Checklist rápido:
+
+1. Subir carpeta `bridge/` actualizada (mismo procedimiento `tar` + `scp`).
+2. Añadir al `.env` de la Pi las variables `MANUAL_LOOP_*` de
+   `bridge/.env.example` (valores por defecto: 15 min, 15/15).
+3. `sudo systemctl restart pendulo-bridge`
+4. Confirmar en logs: `Escuchando modo prueba manual (loop automático)...`
+5. Node-RED debe seguir teniendo `mqtt in` → `pendulo/comando` → `serial out`.
+
+Runbook completo: [`modo-prueba-manual.md`](./modo-prueba-manual.md).
+
 ## Ver también
 
 - `bridge/README.md` — referencia completa de instalación y sección 8

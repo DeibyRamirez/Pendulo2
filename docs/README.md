@@ -5,6 +5,23 @@ físico (Raspberry Pi + Node-RED + broker Mosquitto) para mostrar datos en
 tiempo real y enviar comandos, y explica la lógica del código creado para
 lograrlo.
 
+## Manuales universitarios (Word)
+
+Entregables formales de la plataforma **World Pendulum Alliance**. En la
+portada hay campos editables (`[NOMBRE DEL AUTOR]`, `[DIRECTOR / TUTOR]`,
+`[ASIGNATURA]`, `[CÓDIGO]`, `[SEMESTRE / PERIODO]`). Al abrir cada archivo
+en Microsoft Word, actualice el índice (clic derecho → Actualizar campos).
+
+1. [`Manual_de_Usuario_WPA.docx`](./Manual_de_Usuario_WPA.docx) — roles
+   (Estudiante, Docente, Admin), objetivos, menús, procedimientos, FAQ y
+   glosario.
+2. [`Manual_Tecnico_WPA.docx`](./Manual_Tecnico_WPA.docx) — arquitectura,
+   stack, Firestore, integraciones, MQTT, cámara, despliegue y seguridad.
+
+Para regenerarlos: `cd scripts/documentacion && npm install && npm run generar`.
+
+## Runbooks de ingeniería
+
 Índice:
 
 1. [`arquitectura.md`](./arquitectura.md) — visión general del sistema
@@ -30,6 +47,9 @@ lograrlo.
    en `scripts/camara/`.
 8. [`flujos-excel.md`](./flujos-excel.md) — diagramas de cada descarga de
    Excel (estudiante, docente de dos hojas, cuestionario/plus y admin).
+9. [`modo-prueba-manual.md`](./modo-prueba-manual.md) — captura automatizada
+   desde Node-RED: activar sesión manual en la web, persistir muestras y
+   exportar Excel (docente/admin).
 
 Para instrucciones de **instalación/despliegue** del bridge en la
 Raspberry Pi (referencia técnica completa, con comandos, incluye

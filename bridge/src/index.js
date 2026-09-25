@@ -3,6 +3,7 @@ const logger = require('./logger');
 const { initFirebaseAdmin } = require('./firebaseAdmin');
 const { startMqttToFirestoreBridge } = require('./mqttToFirestore');
 const { startCommandsListener } = require('./commandsToMqtt');
+const { startManualTestLoop } = require('./manualTestLoop');
 
 function main() {
   logger.info('Iniciando pendulo-bridge...', {
@@ -14,9 +15,11 @@ function main() {
 
   const mqttClient = startMqttToFirestoreBridge();
   const unsubscribeComandos = startCommandsListener(mqttClient);
+  const unsubscribeManualLoop = startManualTestLoop(mqttClient);
 
   const shutdown = () => {
     logger.info('Cerrando pendulo-bridge...');
+    unsubscribeManualLoop();
     unsubscribeComandos();
     mqttClient.end(false, {}, () => process.exit(0));
     setTimeout(() => process.exit(0), 3000);

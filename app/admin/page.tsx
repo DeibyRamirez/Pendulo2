@@ -39,6 +39,7 @@ import { DiagnosticoPenduloAdmin } from "@/components/diagnostico-pendulo-admin"
 import { Switch } from "@/components/ui/switch";
 import { useModuloEvaluacion } from "@/hooks/useModuloEvaluacion";
 import { guardarModuloEvaluacion } from "@/lib/moduloEvaluacion";
+import { PruebaManualCard } from "@/components/prueba-manual-card";
 
 type Rol = "Estudiante" | "Docente" | "Admin";
 type EstadoPendulo = "Activo" | "Inactivo" | "En_uso" | "En_mantenimiento";
@@ -302,6 +303,8 @@ export default function DashboardAdminPage() {
               institucion: p.institucion,
             }))}
           />
+
+          <PruebaManualCard />
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Péndulos</p><p className="text-2xl font-bold">{stats.totalPendulos}</p></CardContent></Card>

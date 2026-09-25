@@ -30,6 +30,7 @@ flowchart TB
 | Estudiante | Tiempo real | `exportarExcelGeneral` | `practicas_general_{pendulo}.xlsx` | Todas **sus** prácticas de **ese** péndulo |
 | Estudiante | Historial | `exportarExcelGeneralUsuario` | `practicas_general.xlsx` | Todas **sus** prácticas en los péndulos usados |
 | Docente | `/docente` — Excel de muestras | `exportarExcelMuestrasDocente` | `excel_muestras_UAC-01_{fecha}.xlsx` | 2 hojas: propias + todas con nombre |
+| Docente / Admin | `/docente` o `/admin` — Prueba manual | `exportarLecturasUsuario` | `practica_{pendulo}_{id}.xlsx` | Sesiones `manual_*` (Node-RED automatizado); ver [`modo-prueba-manual.md`](./modo-prueba-manual.md) |
 | Docente | `/docente` — solo plus | `exportarExcelGeneralDocente` | `reporte_docente_{fecha}.xlsx` | Entregas de sus grupos + cuestionario |
 | Docente | Un trabajo — solo plus | `exportarExcelAsignacion` | `reporte_trabajo_{id}.xlsx` | Entregas de **ese** trabajo + cuestionario |
 | Admin | Tiempo real | `exportarLecturasAdmin` | `practicas_general_{pendulo}.xlsx` | Todas las prácticas del péndulo + `usuario_uid` |

@@ -9,6 +9,7 @@ import {
   exportarLecturasUsuario,
   exportarExcelGeneralUsuario,
 } from '@/app/services/lecturasExportService';
+import { esPracticaManual } from '@/app/services/reservacionService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -288,7 +289,11 @@ export default function HistorialPage() {
                             </div>
 
                             <div className="flex items-center gap-4 mt-4 sm:mt-0">
-                              <Badge variant="default">Práctica</Badge>
+                              {esPracticaManual(p.practicaId) ? (
+                                <Badge variant="secondary">Manual</Badge>
+                              ) : (
+                                <Badge variant="default">Práctica</Badge>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"

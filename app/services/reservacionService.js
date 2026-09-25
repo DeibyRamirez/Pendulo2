@@ -6,6 +6,7 @@ import {
   query,
   where,
   getDocs,
+  addDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
@@ -308,6 +309,130 @@ export async function iniciarPractica({ reservacionId, penduloId, usuarioId }) {
   });
 
   return { practicaId, practicaInicio };
+}
+
+/**
+ * Indica si un practicaId corresponde a una sesión de prueba manual / calibración.
+ */
+export function esPracticaManual(practicaId) {
+  return typeof practicaId === 'string' && practicaId.startsWith('manual_');
+}
+
+/**
+ * Inicia captura manual (docente/admin): lock en Firestore sin reserva ni comando web.
+ * El bridge persiste lecturas mientras usuarioActivo esté activo.
+ */
+export async function iniciarPruebaManual({ penduloId, usuarioId }) {
+  const practicaId = `manual_${usuarioId}_${Date.now()}`;
+  const practicaInicio = Timestamp.now();
+  const penduloRef = doc(db, 'pendulo_data', penduloId);
+
+  await runTransaction(db, async (transaction) => {
+    const penduloSnap = await transaction.get(penduloRef);
+    const penduloData = penduloSnap.exists ? penduloSnap.data() : {};
+    const ahora = Timestamp.now();
+    const lockAjenoVigente = lockDeOtroUsuarioVigente(
+      transaction,
+      penduloData,
+      usuarioId,
+      ahora,
+    );
+    if (lockAjenoVigente) {
+      throw new Error(
+        'Ocupado: otro usuario tiene el control del péndulo en su franja de 30 minutos.',
+      );
+    }
+
+    transaction.set(
+      penduloRef,
+      {
+        usuarioActivo: usuarioId,
+        practicaId,
+        practicaInicio,
+        penduloId,
+        reservacionId: null,
+        modoManual: true,
+        loopManual: {
+          activo: true,
+          intervaloMinutos: 15,
+          oscilaciones: 15,
+          distanciaMuro: 15,
+          estado: 'iniciando',
+          cicloActual: 0,
+          ultimoCicloInicio: null,
+          ultimoCicloFin: null,
+          proximoCicloEn: null,
+          ultimoError: null,
+          muestrasUltimoCiclo: 0,
+        },
+      },
+      { merge: true },
+    );
+  });
+
+  return { practicaId, practicaInicio };
+}
+
+/**
+ * Finaliza la captura manual y libera el lock del péndulo.
+ */
+export async function finalizarPruebaManual({ penduloId, usuarioId }) {
+  const penduloRef = doc(db, 'pendulo_data', penduloId);
+
+  const penduloSnap = await getDoc(penduloRef);
+  if (!penduloSnap.exists()) {
+    throw new Error('Péndulo no encontrado');
+  }
+
+  const penduloData = penduloSnap.data();
+  if (penduloData.usuarioActivo !== usuarioId) {
+    throw new Error('No tienes permiso para finalizar esta prueba manual');
+  }
+
+  try {
+    await addDoc(collection(db, 'pendulo_comandos'), {
+      penduloId,
+      usuarioId,
+      accion: 'detener',
+      oscilaciones: null,
+      distanciaMuro: null,
+      reservacionId: null,
+      practicaId: penduloData.practicaId ?? null,
+      estado: 'pendiente',
+      fechaCreacion: Timestamp.now(),
+    });
+  } catch (err) {
+    console.warn('No se pudo encolar comando detener al finalizar prueba manual:', err);
+  }
+
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(penduloRef);
+    if (!snap.exists()) {
+      throw new Error('Péndulo no encontrado');
+    }
+
+    const data = snap.data();
+    if (data.usuarioActivo !== usuarioId) {
+      throw new Error('No tienes permiso para finalizar esta prueba manual');
+    }
+
+    transaction.set(
+      penduloRef,
+      {
+        usuarioActivo: null,
+        practicaId: null,
+        practicaInicio: null,
+        reservacionId: null,
+        modoManual: null,
+        loopManual: {
+          activo: false,
+          estado: 'detenido',
+          proximoCicloEn: null,
+        },
+      },
+      { merge: true },
+    );
+  });
 }
 
 /**

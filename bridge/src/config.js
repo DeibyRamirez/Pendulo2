@@ -26,6 +26,16 @@ const config = {
   defaultPenduloId: process.env.DEFAULT_PENDULO_ID || 'UAC-01',
   lecturasThrottleMs: Number(process.env.LECTURAS_THROTTLE_MS || 300),
   logLevel: process.env.LOG_LEVEL || 'info',
+  manualLoop: {
+    intervalMin: Number(process.env.MANUAL_LOOP_INTERVAL_MIN || 15),
+    oscilaciones: Number(process.env.MANUAL_LOOP_OSC || 15),
+    distanciaMuro: Number(process.env.MANUAL_LOOP_DIST || 15),
+    cycleTimeoutMs: Number(process.env.MANUAL_LOOP_CYCLE_TIMEOUT_MS || 600000),
+    connectRetries: Number(process.env.MANUAL_LOOP_CONNECT_RETRIES || 5),
+    connectRetryDelayMs: Number(process.env.MANUAL_LOOP_CONNECT_RETRY_MS || 2000),
+    commandTimeoutMs: Number(process.env.MANUAL_LOOP_COMMAND_TIMEOUT_MS || 30000),
+    sampleSilenceMs: Number(process.env.MANUAL_LOOP_SAMPLE_SILENCE_MS || 30000),
+  },
 };
 
 module.exports = config;

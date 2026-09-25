@@ -11,6 +11,7 @@ import Link from "next/link";
 import { obtenerEstadisticasDocente } from "@/app/services/grupoService";
 import { exportarExcelGeneralDocente, exportarExcelMuestrasDocente } from "@/app/services/lecturasExportService";
 import { useModuloEvaluacion } from "@/hooks/useModuloEvaluacion";
+import { PruebaManualCard } from "@/components/prueba-manual-card";
 
 export default function DashboardDocentePage() {
   const { user } = useAuth();
@@ -83,6 +84,8 @@ export default function DashboardDocentePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <PruebaManualCard />
+
             {moduloEvaluacion ? (
             <Card className="border-border/50 hover:border-primary/50 transition-colors">
               <CardHeader>
