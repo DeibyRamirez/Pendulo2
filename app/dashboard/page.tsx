@@ -81,42 +81,20 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute requiredRole="Estudiante" exactRole>
-      <div className="min-h-screen bg-background">
-        {/* Navbar */}
-        <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="4" r="2" />
-                  <line x1="12" y1="6" x2="12" y2="16" />
-                  <circle cx="12" cy="18" r="3" fill="currentColor" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">WPA</h1>
-                <p className="text-xs text-muted-foreground">Estudiante</p>
-              </div>
+      <div className="bg-background">
+        <main className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">{user?.institucion}</p>
             </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-foreground">{user?.nombre || user?.email}</p>
-                <p className="text-xs text-muted-foreground">{user?.institucion}</p>
-              </div>
-              <Button variant="outline" size="sm" onClick={logout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Salir
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={logout} className="w-full sm:w-auto touch-target">
+              <LogOut className="w-4 h-4 mr-2" />
+              Salir
+            </Button>
           </div>
-        </nav>
-
-        {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-6 py-8">
           {/* Welcome Section */}
           <div className="mb-8">
-            <h2 className="text-3xl font-bold text-foreground mb-2">Bienvenido, {user?.nombre?.split(" ")[0]}</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Bienvenido, {user?.nombre?.split(" ")[0]}</h2>
             <p className="text-muted-foreground">Explora el péndulo remoto y agenda tus sesiones de experimentos</p>
           </div>
 
@@ -295,7 +273,7 @@ export default function DashboardPage() {
               <CardTitle className="text-lg">Información del Sistema</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="text-center">
                   <p className="text-3xl font-bold text-primary mb-1">{practicasRealizadas}</p>
                   <p className="text-sm text-muted-foreground">Prácticas realizadas</p>

@@ -128,10 +128,10 @@ export default function AgenteIAPage() {
   // RENDER
   // -----------------------------------------------------------
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden">
+    <div className="flex flex-col min-h-[calc(100dvh-3.5rem)] max-h-[calc(100dvh-3.5rem)] md:min-h-[calc(100dvh)] md:max-h-[calc(100dvh)] bg-background overflow-hidden">
 
       {/* ── HEADER ── */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/60 backdrop-blur shrink-0">
+      <header className="flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b border-border bg-card/60 backdrop-blur shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
             <Atom className="h-5 w-5 text-primary" />
@@ -234,7 +234,7 @@ export default function AgenteIAPage() {
       </div>
 
       {/* ── INPUT ── */}
-      <div className="shrink-0 border-t border-border bg-card/60 backdrop-blur px-4 py-4">
+      <div className="shrink-0 border-t border-border bg-card/60 backdrop-blur px-3 sm:px-4 py-3 sm:py-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="max-w-3xl mx-auto">
           <div className="flex items-end gap-3 bg-background border border-border rounded-2xl px-4 py-3 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
             <BookOpen className="h-4 w-4 text-muted-foreground mb-1.5 shrink-0" />

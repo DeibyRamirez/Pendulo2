@@ -143,7 +143,7 @@ function buildBookedSlotOwners(
   return slots
 }
 
-export default function ReservasPage() {
+export default function ReservasPage({ embedded = false }: { embedded?: boolean }) {
   const { user, rol } = useAuth()
   const esDocenteOAdmin = rol === "Docente" || rol === "Admin"
 
@@ -322,11 +322,11 @@ export default function ReservasPage() {
   const misReservasPropias = misReservasActivas.filter((r) => r.usuario_id === user?.uid)
 
   return (
-    <main className="min-h-screen bg-background">
-      <Header />
+    <main className={embedded ? "bg-background" : "min-h-screen bg-background"}>
+      {!embedded && <Header />}
 
-      <div className="pt-24 pb-16">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+      <div className={embedded ? "p-4 md:p-6" : "pt-24 pb-16"}>
+        <div className="mx-auto max-w-7xl px-0 sm:px-2 lg:px-8">
 
           {/* Header */}
           <div className="mb-8">
@@ -356,12 +356,12 @@ export default function ReservasPage() {
             {/* Calendario */}
             <Card className="lg:col-span-2">
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <Calendar className="h-5 w-5 text-primary" />
                     Calendario de Reservas
                   </CardTitle>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center gap-2">
                     <Button variant="outline" size="icon" onClick={prevMonth}>
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
@@ -463,7 +463,7 @@ export default function ReservasPage() {
                     <p className="text-xs text-muted-foreground mb-3">
                       El rojo indica un espacio ocupado por otro usuario (30 minutos). Elige solo un horario libre.
                     </p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {TIME_SLOTS.map((time) => {
                         const booked = isSlotBooked(time)
                         const selected = selectedTime === time
@@ -663,7 +663,7 @@ export default function ReservasPage() {
         </div>
       )}
 
-      <Footer />
+      {!embedded && <Footer />}
     </main>
   )
 }

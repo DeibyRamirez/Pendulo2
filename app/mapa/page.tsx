@@ -9,7 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Search, MapPin, Activity, Calendar, Globe, Radio } from "lucide-react"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { ArrowLeft, Search, MapPin, Activity, Calendar, Globe, Radio, List } from "lucide-react"
 import { usePendulos } from "@/hooks/usePendulos"
 import { useAuth } from "@/hooks/useAuth"
 
@@ -68,11 +75,99 @@ const getEstadoBadge = (estado: string) => {
   }
 }
 
+function ListaNodosPanel({
+  stats,
+  loading,
+  searchTerm,
+  onSearchChange,
+  filteredPendulos,
+  selectedPendulo,
+  onSelect,
+}: {
+  stats: { totalPendulos: number; activos: number }
+  loading: boolean
+  searchTerm: string
+  onSearchChange: (value: string) => void
+  filteredPendulos: PenduloUI[]
+  selectedPendulo: PenduloUI | null
+  onSelect: (pendulo: PenduloUI) => void
+}) {
+  return (
+    <>
+      <div className="p-4 border-b border-border">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg bg-secondary/50">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <Radio className="w-4 h-4" />
+              <span className="text-xs">Total Nodos</span>
+            </div>
+            <p className="text-2xl font-bold">{stats.totalPendulos}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-green-500/10">
+            <div className="flex items-center gap-2 text-green-400 mb-1">
+              <Activity className="w-4 h-4" />
+              <span className="text-xs">Disponibles</span>
+            </div>
+            <p className="text-2xl font-bold text-green-400">{stats.activos}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 border-b border-border">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por institución, país..."
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="pl-10 bg-input/50"
+          />
+        </div>
+      </div>
+
+      <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+        <h3 className="text-sm font-medium text-muted-foreground mb-3">
+          Péndulos de la Red ({filteredPendulos.length})
+        </h3>
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Cargando péndulos...</p>
+        ) : (
+          filteredPendulos.map((pendulo) => (
+            <button
+              key={pendulo.id}
+              onClick={() => onSelect(pendulo)}
+              className={`w-full p-4 rounded-lg border transition-all text-left touch-target ${
+                selectedPendulo?.id === pendulo.id
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-card/50 hover:bg-card hover:border-border/80"
+              }`}
+            >
+              <div className="flex items-start justify-between mb-2 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${getEstadoColor(pendulo.estado)}`} />
+                  <span className="text-sm font-medium truncate">{pendulo.ciudad}</span>
+                </div>
+                {getEstadoBadge(pendulo.estado)}
+              </div>
+              <p className="text-sm text-foreground font-medium mb-1 line-clamp-1">{pendulo.institucion}</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                {pendulo.pais}
+              </p>
+            </button>
+          ))
+        )}
+      </div>
+    </>
+  )
+}
+
 export default function MapaWPAPage() {
   const { pendulos, loading } = usePendulos()
   const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedPendulo, setSelectedPendulo] = useState<PenduloUI | null>(null)
+  const [listaAbierta, setListaAbierta] = useState(false)
 
   const pendulosUI = useMemo(
     () =>
@@ -102,114 +197,84 @@ export default function MapaWPAPage() {
     activos: pendulosUI.filter((p) => p.estado === "Activo").length,
   }
 
+  const panelProps = {
+    stats,
+    loading,
+    searchTerm,
+    onSearchChange: setSearchTerm,
+    filteredPendulos,
+    selectedPendulo,
+    onSelect: (pendulo: PenduloUI) => {
+      setSelectedPendulo(pendulo)
+      setListaAbierta(false)
+    },
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50 shrink-0">
+        <div className="container mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <Link href="/">
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="touch-target shrink-0">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </Link>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                <Globe className="w-5 h-5 text-primary" />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
               </div>
-              <div>
-                <h1 className="font-semibold">Red World Pendulum Alliance</h1>
-                <p className="text-xs text-muted-foreground">Mapa global en tiempo real</p>
+              <div className="min-w-0">
+                <h1 className="font-semibold text-sm sm:text-base truncate">Red WPA</h1>
+                <p className="text-xs text-muted-foreground hidden sm:block">Mapa global en tiempo real</p>
               </div>
             </div>
           </div>
-          {!user && (
-            <Link href="/login">
-              <Button variant="outline" size="sm">Iniciar Sesión</Button>
-            </Link>
-          )}
+          <div className="flex items-center gap-2">
+            <Sheet open={listaAbierta} onOpenChange={setListaAbierta}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="lg:hidden touch-target">
+                  <List className="w-4 h-4 mr-2" />
+                  <span className="hidden xs:inline">Nodos</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[min(100vw-2rem,24rem)] p-0 flex flex-col">
+                <SheetHeader className="p-4 border-b border-border">
+                  <SheetTitle>Lista de nodos</SheetTitle>
+                </SheetHeader>
+                <ListaNodosPanel {...panelProps} />
+              </SheetContent>
+            </Sheet>
+            {!user && (
+              <Link href="/login">
+                <Button variant="outline" size="sm" className="touch-target">Iniciar sesión</Button>
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
-      <div className="flex h-[calc(100vh-4rem)]">
-        <aside className="w-96 border-r border-border bg-card/30 overflow-y-auto">
-          <div className="p-4 border-b border-border">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-secondary/50">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <Radio className="w-4 h-4" />
-                  <span className="text-xs">Total Nodos</span>
-                </div>
-                <p className="text-2xl font-bold">{stats.totalPendulos}</p>
-              </div>
-              <div className="p-3 rounded-lg bg-green-500/10">
-                <div className="flex items-center gap-2 text-green-400 mb-1">
-                  <Activity className="w-4 h-4" />
-                  <span className="text-xs">Disponibles</span>
-                </div>
-                <p className="text-2xl font-bold text-green-400">{stats.activos}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 border-b border-border">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por institución, país..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-input/50"
-              />
-            </div>
-          </div>
-
-          <div className="p-4 space-y-3">
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">
-              Péndulos de la Red ({filteredPendulos.length})
-            </h3>
-            {loading ? (
-              <p className="text-sm text-muted-foreground">Cargando péndulos...</p>
-            ) : (
-              filteredPendulos.map((pendulo) => (
-                <button
-                  key={pendulo.id}
-                  onClick={() => setSelectedPendulo(pendulo)}
-                  className={`w-full p-4 rounded-lg border transition-all text-left ${selectedPendulo?.id === pendulo.id
-                    ? "border-primary bg-primary/10"
-                    : "border-border bg-card/50 hover:bg-card hover:border-border/80"
-                    }`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${getEstadoColor(pendulo.estado)}`} />
-                      <span className="text-sm font-medium">{pendulo.ciudad}</span>
-                    </div>
-                    {getEstadoBadge(pendulo.estado)}
-                  </div>
-                  <p className="text-sm text-foreground font-medium mb-1 line-clamp-1">{pendulo.institucion}</p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    {pendulo.pais}
-                  </p>
-                </button>
-              ))
-            )}
-          </div>
+      <div className="flex flex-1 min-h-0 h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)]">
+        <aside className="hidden lg:flex lg:w-96 border-r border-border bg-card/30 flex-col overflow-hidden">
+          <ListaNodosPanel {...panelProps} />
         </aside>
 
-        <main className="flex-1 relative overflow-hidden">
+        <main className="flex-1 relative overflow-hidden min-w-0">
           <div className="absolute inset-0 z-0">
-            <MapaLeaflet pendulos={filteredPendulos} onSelect={(pendulo) => {
-              const penduloUI = pendulosUI.find(p => p.id === pendulo.id);
-              if (penduloUI) setSelectedPendulo(penduloUI);
-            }} />
+            <MapaLeaflet
+              pendulos={filteredPendulos}
+              onSelect={(pendulo) => {
+                const penduloUI = pendulosUI.find((p) => p.id === pendulo.id)
+                if (penduloUI) setSelectedPendulo(penduloUI)
+              }}
+            />
           </div>
 
           {selectedPendulo && (
-            <div className="absolute bottom-0 left-0 right-0 z-[400] p-4">
+            <div className="absolute bottom-0 left-0 right-0 z-[400] p-3 sm:p-4">
               <Card className="border-border bg-card/98 backdrop-blur-sm shadow-lg">
                 <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">{getEstadoBadge(selectedPendulo.estado)}</div>
                       <CardTitle className="text-base truncate">{selectedPendulo.institucion}</CardTitle>
@@ -218,19 +283,25 @@ export default function MapaWPAPage() {
                         {selectedPendulo.ciudad}, {selectedPendulo.pais}
                       </p>
                     </div>
-                    <button onClick={() => setSelectedPendulo(null)} className="text-muted-foreground hover:text-foreground ml-2">x</button>
+                    <button
+                      onClick={() => setSelectedPendulo(null)}
+                      className="text-muted-foreground hover:text-foreground ml-2 touch-target"
+                      aria-label="Cerrar detalle"
+                    >
+                      ×
+                    </button>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0 flex gap-2">
+                <CardContent className="pt-0 flex flex-col sm:flex-row gap-2">
                   <Link href={`/pendulo/${selectedPendulo.pendulo_id || selectedPendulo.id}`} className="flex-1">
-                    <Button className="w-full" size="sm">
+                    <Button className="w-full touch-target" size="sm">
                       <Activity className="w-3 h-3 mr-1" />
                       Visualizar
                     </Button>
                   </Link>
                   {user && selectedPendulo.estado === "Activo" && (
                     <Link href={`/reservas?pendulo=${selectedPendulo.id}`} className="flex-1">
-                      <Button variant="outline" className="w-full" size="sm">
+                      <Button variant="outline" className="w-full touch-target" size="sm">
                         <Calendar className="w-3 h-3 mr-1" />
                         Agendar
                       </Button>

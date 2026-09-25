@@ -87,11 +87,11 @@ export function CameraStream({ penduloId = "UAC-01" }: CameraStreamProps) {
           : "border-border/50"
       }
     >
-      <CardHeader className="pb-3 shrink-0">
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Camera className="w-5 h-5 text-primary" />
-            Visualización en vivo
+      <CardHeader className="pb-3 shrink-0 px-3 sm:px-6">
+        <div className="flex items-center justify-between gap-2 sm:gap-3">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2 min-w-0">
+            <Camera className="w-5 h-5 text-primary shrink-0" />
+            <span className="truncate">Visualización en vivo</span>
           </CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-xs">
@@ -187,7 +187,7 @@ export function CameraStream({ penduloId = "UAC-01" }: CameraStreamProps) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 text-white hover:bg-white/20"
+                  className="h-10 w-10 sm:h-8 sm:w-8 text-white hover:bg-white/20 touch-target"
                   onClick={() => {
                     setReproduciendo((prev) => !prev)
                     if (!reproduciendo) {
@@ -201,7 +201,7 @@ export function CameraStream({ penduloId = "UAC-01" }: CameraStreamProps) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 text-white hover:bg-white/20"
+                  className="h-10 w-10 sm:h-8 sm:w-8 text-white hover:bg-white/20 touch-target"
                   onClick={() => {
                     setEstadoConexion("conectando")
                     setReproduciendo(true)
@@ -215,7 +215,7 @@ export function CameraStream({ penduloId = "UAC-01" }: CameraStreamProps) {
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 text-white hover:bg-white/20"
+                className="h-10 w-10 sm:h-8 sm:w-8 text-white hover:bg-white/20 touch-target"
                 onClick={() => setPantallaCompleta((prev) => !prev)}
                 aria-label={pantallaCompleta ? "Salir de pantalla completa" : "Ver en pantalla completa"}
               >

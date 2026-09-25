@@ -15,6 +15,7 @@ import {
   Globe,
   LogOut,
   MapPin,
+  Menu,
   Plus,
   RefreshCw,
   Save,
@@ -22,7 +23,15 @@ import {
   Users,
   Wrench,
   ClipboardList,
+  X,
 } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   actualizarEstadoPendulo,
   actualizarPendulo,
@@ -91,6 +100,7 @@ export default function DashboardAdminPage() {
   const [editingPenduloId, setEditingPenduloId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"pendulos" | "usuarios" | "reservas">("pendulos");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const [nuevoPendulo, setNuevoPendulo] = useState({
     pendulo_id: "",
@@ -239,12 +249,12 @@ export default function DashboardAdminPage() {
     <ProtectedRoute requiredRole="Admin" exactRole>
       <div className="min-h-screen bg-background">
         <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-bold text-foreground">Panel Admin WPA</h1>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-foreground truncate">Panel Admin WPA</h1>
               <p className="text-xs text-muted-foreground">Gestión completa de la plataforma</p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-4">
               <div className="text-right">
                 <p className="text-sm font-medium text-foreground">{user?.nombre || user?.email}</p>
                 <p className="text-xs text-muted-foreground">Administrador</p>
@@ -258,10 +268,36 @@ export default function DashboardAdminPage() {
                 <LogOut className="w-4 h-4 mr-2" /> Cerrar sesión
               </Button>
             </div>
+            <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="lg:hidden touch-target" aria-label="Abrir menú">
+                  {mobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[min(100vw-2rem,20rem)]">
+                <SheetHeader>
+                  <SheetTitle>Menú administrador</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 space-y-4">
+                  <div className="rounded-lg border border-border p-3">
+                    <p className="text-sm font-medium text-foreground">{user?.nombre || user?.email}</p>
+                    <p className="text-xs text-muted-foreground">Administrador</p>
+                  </div>
+                  <Button asChild variant="outline" className="w-full touch-target" onClick={() => setMobileNavOpen(false)}>
+                    <Link href="/mapa">
+                      <Globe className="w-4 h-4 mr-2" /> Ver mapa WPA
+                    </Link>
+                  </Button>
+                  <Button variant="destructive" className="w-full touch-target" onClick={() => { setMobileNavOpen(false); logout(); }}>
+                    <LogOut className="w-4 h-4 mr-2" /> Cerrar sesión
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </nav>
 
-        <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
           {error && (
             <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               {error}
@@ -334,16 +370,18 @@ export default function DashboardAdminPage() {
             </CardContent>
           </Card>
 
-          <div className="grid md:grid-cols-3 gap-4">
-            <Card className={`cursor-pointer border ${activeTab === "pendulos" ? "border-primary" : "border-border"}`} onClick={() => setActiveTab("pendulos")}>
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 min-w-[min(100%,48rem)] sm:min-w-0">
+            <Card className={`cursor-pointer border touch-target ${activeTab === "pendulos" ? "border-primary" : "border-border"}`} onClick={() => setActiveTab("pendulos")}>
               <CardHeader><CardTitle className="flex items-center gap-2"><Wrench className="w-5 h-5" /> Péndulos</CardTitle><CardDescription>Alta y edición de péndulos</CardDescription></CardHeader>
             </Card>
-            <Card className={`cursor-pointer border ${activeTab === "usuarios" ? "border-primary" : "border-border"}`} onClick={() => setActiveTab("usuarios")}>
+            <Card className={`cursor-pointer border touch-target ${activeTab === "usuarios" ? "border-primary" : "border-border"}`} onClick={() => setActiveTab("usuarios")}>
               <CardHeader><CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> Gestión de usuarios</CardTitle><CardDescription>Roles y estado de cuentas</CardDescription></CardHeader>
             </Card>
-            <Card className={`cursor-pointer border ${activeTab === "reservas" ? "border-primary" : "border-border"}`} onClick={() => setActiveTab("reservas")}>
+            <Card className={`cursor-pointer border touch-target ${activeTab === "reservas" ? "border-primary" : "border-border"}`} onClick={() => setActiveTab("reservas")}>
               <CardHeader><CardTitle className="flex items-center gap-2"><CalendarClock className="w-5 h-5" /> Todas reservaciones</CardTitle><CardDescription>Vista global de sesiones</CardDescription></CardHeader>
             </Card>
+            </div>
           </div>
 
           {activeTab === "pendulos" && (
