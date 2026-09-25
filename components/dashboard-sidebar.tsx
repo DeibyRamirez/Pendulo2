@@ -2,22 +2,29 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
-import { 
-  Activity, 
-  LayoutDashboard, 
-  Calendar, 
-  History, 
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
+import {
+  Activity,
+  LayoutDashboard,
+  Calendar,
+  History,
   Home,
   Bot,
   ClipboardList,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { useState } from "react"
 import { useModuloEvaluacion } from "@/hooks/useModuloEvaluacion"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  useSidebar,
+} from "@/components/ui/sidebar"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -29,88 +36,83 @@ const navigation = [
   { name: "Agente IA", href: "/dashboard/agente-ia", icon: Bot },
 ]
 
-export function DashboardSidebar() {
+function NavItems() {
   const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(false)
+  const { setOpenMobile, isMobile } = useSidebar()
   const { activo: moduloEvaluacion } = useModuloEvaluacion()
   const itemsVisibles = navigation.filter((item) => !item.plusEvaluacion || moduloEvaluacion)
 
+  const closeMobile = () => {
+    if (isMobile) setOpenMobile(false)
+  }
+
   return (
-    <aside className={cn(
-      "flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300",
-      collapsed ? "w-16" : "w-64"
-    )}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-        <Link href="/" className={cn("flex items-center gap-2", collapsed && "justify-center")}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
-            <Activity className="h-6 w-6 text-sidebar-primary-foreground" />
-          </div>
-          {!collapsed && (
-            <div className="flex flex-col">
-              <span className="text-lg font-bold text-sidebar-foreground">WPA</span>
-              <span className="text-xs text-muted-foreground">Dashboard</span>
-            </div>
-          )}
-        </Link>
-        <Button 
-          variant="ghost" 
-          size="icon"
-          className="text-sidebar-foreground"
-          onClick={() => setCollapsed(!collapsed)}
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </Button>
-      </div>
+    <>
+      {itemsVisibles.map((item) => {
+        const isActive =
+          pathname === item.href ||
+          (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`))
+        return (
+          <SidebarMenuItem key={item.name}>
+            <SidebarMenuButton asChild isActive={isActive} tooltip={item.name}>
+              <Link href={item.href} onClick={closeMobile}>
+                <item.icon />
+                <span>{item.name}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )
+      })}
+    </>
+  )
+}
 
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2">
-        {itemsVisibles.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`))
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                isActive 
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground" 
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                collapsed && "justify-center px-2"
-              )}
-            >
-              <item.icon className="h-5 w-5 flex-shrink-0" />
-              {!collapsed && <span>{item.name}</span>}
-            </Link>
-          )
-        })}
-      </nav>
+export function DashboardSidebar() {
+  const { setOpenMobile, isMobile } = useSidebar()
 
-      {/* Footer */}
-      <div className="p-4 border-t border-sidebar-border space-y-2">
-        <Link
-          href="/"
-          className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
-            collapsed && "justify-center px-2"
-          )}
-        >
-          <Home className="h-5 w-5 flex-shrink-0" />
-          {!collapsed && <span>Volver al inicio</span>}
-        </Link>
-        {/* <button
-          className={cn(
-            "flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors",
-            collapsed && "justify-center px-2"
-          )}
-        >
-          <LogOut className="h-5 w-5 flex-shrink-0" />
-          {!collapsed && <span>Cerrar sesión</span>}
-        </button> */}
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <Link href="/" onClick={() => isMobile && setOpenMobile(false)}>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
+                  <Activity className="h-4 w-4 text-sidebar-primary-foreground" />
+                </div>
+                <div className="flex flex-col gap-0.5 leading-none">
+                  <span className="font-semibold">WPA</span>
+                  <span className="text-xs text-muted-foreground">Dashboard</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
 
-      </div>
-    </aside>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <NavItems />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Volver al inicio">
+              <Link href="/" onClick={() => isMobile && setOpenMobile(false)}>
+                <Home />
+                <span>Volver al inicio</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
   )
 }

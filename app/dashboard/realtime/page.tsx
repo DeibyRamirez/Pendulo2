@@ -731,9 +731,9 @@ export default function RealtimePage() {
   ).sort((a, b) => a.muestra - b.muestra)
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6 flex flex-col">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="order-2 lg:order-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-foreground">Visualización en Tiempo Real</h1>
@@ -767,8 +767,8 @@ export default function RealtimePage() {
             <p className="text-xs text-primary mt-1 font-medium">{estadoDispositivoLabel}</p>
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void handleExportar()} disabled={exportando}>
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full sm:w-auto">
+          <Button variant="outline" className="w-full sm:w-auto touch-target" onClick={() => void handleExportar()} disabled={exportando}>
             {exportando ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -778,6 +778,7 @@ export default function RealtimePage() {
           </Button>
           <Button
             variant="outline"
+            className="w-full sm:w-auto touch-target"
             onClick={() => void handleExportarGeneral()}
             disabled={exportandoGeneral}
           >
@@ -792,7 +793,7 @@ export default function RealtimePage() {
       </div>
 
       {errorPendulo && (
-        <Card className="border-destructive/50">
+        <Card className="order-3 lg:order-2 border-destructive/50">
           <CardContent className="p-4 text-sm text-destructive">
             {errorPendulo}
           </CardContent>
@@ -800,10 +801,10 @@ export default function RealtimePage() {
       )}
 
       {/* Control Panel */}
-      <Card>
+      <Card className="order-4 lg:order-3">
         <CardContent className="p-4 space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-col lg:flex-row lg:flex-wrap items-stretch lg:items-end justify-between gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full lg:w-auto lg:flex lg:flex-wrap lg:items-end">
               <div className="space-y-1">
                 <Label htmlFor="oscilaciones" className="text-xs">
                   Oscilaciones ({OSCILACIONES_MIN}-{OSCILACIONES_MAX})
@@ -816,7 +817,7 @@ export default function RealtimePage() {
                   value={oscilaciones}
                   onChange={(e) => setOscilaciones(Number(e.target.value))}
                   disabled={!puedeIniciar || ocupadoPorOtro || enviandoComando || practicaEnCurso}
-                  className="w-32"
+                  className="w-full sm:w-32"
                 />
               </div>
               <div className="space-y-1">
@@ -831,13 +832,13 @@ export default function RealtimePage() {
                   value={distanciaMuro}
                   onChange={(e) => setDistanciaMuro(Number(e.target.value))}
                   disabled={!puedeIniciar || ocupadoPorOtro || enviandoComando || practicaEnCurso}
-                  className="w-36"
+                  className="w-full sm:w-36"
                 />
               </div>
               {mounted ? (
                 <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
                   <AlertDialogTrigger asChild>
-                    <Button disabled={!puedeIniciar || ocupadoPorOtro || enviandoComando || !parametrosValidos || practicaEnCurso}>
+                    <Button className="w-full sm:w-auto touch-target min-h-[44px]" disabled={!puedeIniciar || ocupadoPorOtro || enviandoComando || !parametrosValidos || practicaEnCurso}>
                       {enviandoComando ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
@@ -959,7 +960,7 @@ export default function RealtimePage() {
       )}
 
       {practicaConError && (
-        <Card className="border-destructive/50 bg-destructive/5">
+        <Card className="order-5 lg:order-4 border-destructive/50 bg-destructive/5">
           <CardContent className="p-4 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
             <div>
@@ -975,7 +976,7 @@ export default function RealtimePage() {
       )}
 
       {/* Main visualization grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="order-6 lg:order-5 grid gap-6 lg:grid-cols-3">
         {/* Resumen de la práctica */}
         <Card>
           <CardHeader>
@@ -1049,10 +1050,12 @@ export default function RealtimePage() {
       </div>
 
       {/* Camera Stream - RF-09 */}
-      <CameraStream penduloId={penduloId} isLive={hayDatosEnVivo} />
+      <div className="order-1 lg:order-6">
+        <CameraStream penduloId={penduloId} isLive={hayDatosEnVivo} />
+      </div>
 
       {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="order-7 lg:order-7 grid gap-6 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Período por muestra</CardTitle>
@@ -1127,7 +1130,7 @@ export default function RealtimePage() {
       </div>
 
       {/* Data table */}
-      <Card>
+      <Card className="order-8 lg:order-8">
         <CardHeader>
           <CardTitle className="text-lg">Registro de Datos</CardTitle>
           <CardDescription>

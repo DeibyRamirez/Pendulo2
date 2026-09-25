@@ -57,7 +57,7 @@ function duracionPractica(inicio: Timestamp | null | undefined, fin: Timestamp |
   return `${Math.round(segundos / 60)} min`;
 }
 
-export default function HistorialPage() {
+export default function HistorialPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const result = useReservations(user?.uid || '');
   const reservaciones = result?.reservaciones || [];
@@ -135,12 +135,12 @@ export default function HistorialPage() {
 
   return (
     <ProtectedRoute requiredRole="Estudiante">
-      <main className="min-h-screen bg-background">
-        <div className="pt-24 pb-16">
-          <div className="mx-auto max-w-7xl px-6 lg:px-8">
+      <main className={embedded ? "bg-background" : "min-h-screen bg-background"}>
+        <div className={embedded ? "p-4 md:p-6" : "pt-24 pb-16"}>
+          <div className="mx-auto max-w-7xl px-0 sm:px-2 lg:px-8">
 
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-foreground">Historial de prácticas</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Historial de prácticas</h1>
               <p className="text-muted-foreground mt-2">
                 Cada vez que inicias una práctica se genera un Excel propio. El Excel general
                 reúne todas las muestras de todas tus prácticas.
