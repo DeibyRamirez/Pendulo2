@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
-import { iniciarSesion, iniciarSesionConGoogle, obtenerPerfilUsuario, perfilTieneInstitucion, obtenerRutaDashboardPorRol } from '../services/authService';
+import { iniciarSesion, iniciarSesionConGoogle, obtenerPerfilUsuario, perfilTieneInstitucion, obtenerRutaDashboardPorRol, procesarRetornoGoogle } from '../services/authService';
 import { useAuth } from '@/hooks/useAuth';
 import { getDashboardPathByRole } from '@/lib/roles';
 import { Button } from "@/components/ui/button"
@@ -34,6 +34,50 @@ export default function LoginPage() {
       setLoginIntent(false);
     }
   }, [loginIntent, user, rol, router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const redirectPendiente = sessionStorage.getItem('googleRedirectPending');
+    if (!redirectPendiente) return;
+
+    sessionStorage.removeItem('googleRedirectPending');
+
+    async function manejarRetornoGoogle() {
+      setIsGoogleLoading(true);
+      try {
+        const credencial = await procesarRetornoGoogle();
+        if (!credencial || cancelled) return;
+
+        const usuario = credencial.user;
+        const perfil = await obtenerPerfilUsuario(usuario.uid);
+
+        if (perfilTieneInstitucion(perfil)) {
+          router.push(`/${obtenerRutaDashboardPorRol(perfil.rol)}`);
+          return;
+        }
+
+        const nombre = usuario.displayName || usuario.email?.split('@')[0] || 'Usuario';
+        router.push(
+          `/registro?uid=${encodeURIComponent(usuario.uid)}&email=${encodeURIComponent(usuario.email || '')}&nombre=${encodeURIComponent(nombre)}&fotoURL=${encodeURIComponent(usuario.photoURL || '')}`
+        );
+      } catch (err) {
+        if (cancelled) return;
+        const authError = err as AuthError;
+        setError(
+          authError.code === 'auth/unauthorized-domain'
+            ? 'Solo puedes ingresar con una cuenta educativa que termine en .edu.co.'
+            : traducirError(authError.code)
+        );
+      } finally {
+        if (!cancelled) setIsGoogleLoading(false);
+      }
+    }
+
+    manejarRetornoGoogle();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   interface ErrorMap {
     [key: string]: string;
@@ -85,27 +129,14 @@ export default function LoginPage() {
      setIsGoogleLoading(true);
 
      try {
-       const credencial = await iniciarSesionConGoogle();
-       const usuario = credencial.user;
-       const perfil = await obtenerPerfilUsuario(usuario.uid);
-
-       if (perfilTieneInstitucion(perfil)) {
-         router.push(`/${obtenerRutaDashboardPorRol(perfil.rol)}`);
-         return;
-       }
-
-       const nombre = usuario.displayName || usuario.email?.split('@')[0] || 'Usuario';
-       router.push(
-         `/registro?uid=${encodeURIComponent(usuario.uid)}&email=${encodeURIComponent(usuario.email || '')}&nombre=${encodeURIComponent(nombre)}&fotoURL=${encodeURIComponent(usuario.photoURL || '')}`
-       );
+       await iniciarSesionConGoogle();
      } catch (err) {
        const authError = err as AuthError;
-        setError(
-          authError.code === 'auth/unauthorized-domain'
-            ? 'Solo puedes ingresar con una cuenta educativa que termine en .edu.co.'
-            : traducirError(authError.code)
-        );
-     } finally {
+       setError(
+         authError.code === 'auth/unauthorized-domain'
+           ? 'Solo puedes ingresar con una cuenta educativa que termine en .edu.co.'
+           : traducirError(authError.code)
+       );
        setIsGoogleLoading(false);
      }
    }
