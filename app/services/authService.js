@@ -17,7 +17,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   updateProfile,
   sendPasswordResetEmail,
@@ -64,13 +65,35 @@ export function perfilTieneInstitucion(perfil) {
   return Boolean(perfil && String(perfil.institucion || '').trim());
 }
 
-/**
- * Inicia sesión con Google y valida que el correo sea institucional.
- */
-export async function iniciarSesionConGoogle() {
+function crearProveedorGoogle() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  const credencial = await signInWithPopup(auth, provider);
+  return provider;
+}
+
+/**
+ * Redirige a Google para elegir cuenta (más fiable que popup en Firefox/Chrome).
+ * El resultado se procesa con procesarRetornoGoogle() al volver a /login.
+ */
+export async function iniciarSesionConGoogle() {
+  try {
+    await signOut(auth);
+  } catch {
+    // Sin sesión previa en Firebase.
+  }
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem('googleRedirectPending', '1');
+  }
+  await signInWithRedirect(auth, crearProveedorGoogle());
+}
+
+/**
+ * Procesa el retorno de Google tras signInWithRedirect.
+ * @returns {Promise<import('firebase/auth').UserCredential | null>}
+ */
+export async function procesarRetornoGoogle() {
+  const credencial = await getRedirectResult(auth);
+  if (!credencial?.user) return null;
   await validarSesionInstitucional(credencial.user);
   return credencial;
 }
