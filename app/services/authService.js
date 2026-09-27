@@ -69,6 +69,7 @@ export function perfilTieneInstitucion(perfil) {
  */
 export async function iniciarSesionConGoogle() {
   const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
   const credencial = await signInWithPopup(auth, provider);
   await validarSesionInstitucional(credencial.user);
   return credencial;
