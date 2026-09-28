@@ -318,6 +318,23 @@ export function esPracticaManual(practicaId) {
   return typeof practicaId === 'string' && practicaId.startsWith('manual_');
 }
 
+function buildLoopManualInicial() {
+  return {
+    activo: true,
+    intervaloMinutos: 15,
+    oscilaciones: 15,
+    distanciaMuro: 15,
+    estado: 'iniciando',
+    cicloActual: 0,
+    ultimoCicloInicio: null,
+    ultimoCicloFin: null,
+    proximoCicloEn: null,
+    ultimoError: null,
+    muestrasUltimoCiclo: 0,
+    reinicioEn: Timestamp.now(),
+  };
+}
+
 /**
  * Inicia captura manual (docente/admin): lock en Firestore sin reserva ni comando web.
  * El bridge persiste lecturas mientras usuarioActivo esté activo.
@@ -329,7 +346,7 @@ export async function iniciarPruebaManual({ penduloId, usuarioId }) {
 
   await runTransaction(db, async (transaction) => {
     const penduloSnap = await transaction.get(penduloRef);
-    const penduloData = penduloSnap.exists ? penduloSnap.data() : {};
+    const penduloData = penduloSnap.exists() ? penduloSnap.data() : {};
     const ahora = Timestamp.now();
     const lockAjenoVigente = lockDeOtroUsuarioVigente(
       transaction,
@@ -352,19 +369,44 @@ export async function iniciarPruebaManual({ penduloId, usuarioId }) {
         penduloId,
         reservacionId: null,
         modoManual: true,
-        loopManual: {
-          activo: true,
-          intervaloMinutos: 15,
-          oscilaciones: 15,
-          distanciaMuro: 15,
-          estado: 'iniciando',
-          cicloActual: 0,
-          ultimoCicloInicio: null,
-          ultimoCicloFin: null,
-          proximoCicloEn: null,
-          ultimoError: null,
-          muestrasUltimoCiclo: 0,
-        },
+        loopManual: buildLoopManualInicial(),
+      },
+      { merge: true },
+    );
+  });
+
+  return { practicaId, practicaInicio };
+}
+
+/**
+ * Reinicia el loop automático en una sesión manual ya activa (misma captura).
+ * Genera un practicaId nuevo para que el bridge detecte el reinicio.
+ */
+export async function reiniciarLoopManual({ penduloId, usuarioId }) {
+  const practicaId = `manual_${usuarioId}_${Date.now()}`;
+  const practicaInicio = Timestamp.now();
+  const penduloRef = doc(db, 'pendulo_data', penduloId);
+
+  await runTransaction(db, async (transaction) => {
+    const penduloSnap = await transaction.get(penduloRef);
+    if (!penduloSnap.exists()) {
+      throw new Error('Péndulo no encontrado');
+    }
+
+    const penduloData = penduloSnap.data();
+    if (penduloData.usuarioActivo !== usuarioId) {
+      throw new Error('No tienes permiso para reiniciar esta prueba manual');
+    }
+    if (penduloData.modoManual !== true) {
+      throw new Error('No hay una sesión de prueba manual activa');
+    }
+
+    transaction.set(
+      penduloRef,
+      {
+        practicaId,
+        practicaInicio,
+        loopManual: buildLoopManualInicial(),
       },
       { merge: true },
     );
@@ -389,21 +431,7 @@ export async function finalizarPruebaManual({ penduloId, usuarioId }) {
     throw new Error('No tienes permiso para finalizar esta prueba manual');
   }
 
-  try {
-    await addDoc(collection(db, 'pendulo_comandos'), {
-      penduloId,
-      usuarioId,
-      accion: 'detener',
-      oscilaciones: null,
-      distanciaMuro: null,
-      reservacionId: null,
-      practicaId: penduloData.practicaId ?? null,
-      estado: 'pendiente',
-      fechaCreacion: Timestamp.now(),
-    });
-  } catch (err) {
-    console.warn('No se pudo encolar comando detener al finalizar prueba manual:', err);
-  }
+  const practicaId = penduloData.practicaId ?? null;
 
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(penduloRef);
@@ -433,6 +461,22 @@ export async function finalizarPruebaManual({ penduloId, usuarioId }) {
       { merge: true },
     );
   });
+
+  try {
+    await addDoc(collection(db, 'pendulo_comandos'), {
+      penduloId,
+      usuarioId,
+      accion: 'detener',
+      oscilaciones: null,
+      distanciaMuro: null,
+      reservacionId: null,
+      practicaId,
+      estado: 'pendiente',
+      fechaCreacion: Timestamp.now(),
+    });
+  } catch (err) {
+    console.warn('No se pudo encolar comando detener al finalizar prueba manual:', err);
+  }
 }
 
 /**

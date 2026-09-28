@@ -257,11 +257,19 @@ function startManualTestLoop(mqttClient) {
   let stopRequested = false;
   let abortController = null;
   let waitTimer = null;
+  let waitReject = null;
+  let activePracticaId = null;
+  let orchestratorGeneration = 0;
 
   const clearWaitTimer = () => {
     if (waitTimer) {
       clearTimeout(waitTimer);
       waitTimer = null;
+    }
+    if (waitReject) {
+      const reject = waitReject;
+      waitReject = null;
+      reject(new Error('aborted'));
     }
   };
 
@@ -275,30 +283,62 @@ function startManualTestLoop(mqttClient) {
     orchestrating = false;
   };
 
-  const scheduleNextCycle = (delayMs) => {
+  const scheduleNextCycle = (delayMs, signal) => {
     clearWaitTimer();
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new Error('aborted'));
+        return;
+      }
+
+      waitReject = reject;
       waitTimer = setTimeout(() => {
         waitTimer = null;
+        waitReject = null;
         resolve();
       }, delayMs);
+
+      const onAbort = () => {
+        clearWaitTimer();
+        reject(new Error('aborted'));
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
     });
   };
 
-  const runOrchestrator = async (initialSession) => {
-    orchestrating = true;
+  const needsOrchestratorRestart = (data) => {
+    if (!data?.practicaId || !activePracticaId) return false;
+    return data.practicaId !== activePracticaId;
+  };
+
+  const startOrchestrator = (session) => {
+    orchestratorGeneration += 1;
+    const generation = orchestratorGeneration;
+    activePracticaId = session.practicaId ?? null;
     stopRequested = false;
+    orchestrating = true;
+    void runOrchestrator(session, generation);
+  };
+
+  const runOrchestrator = async (initialSession, generation) => {
     abortController = new AbortController();
     const { signal } = abortController;
 
     let cycleNumber = initialSession.loopManual?.cicloActual ?? 0;
     if (cycleNumber < 1) cycleNumber = 1;
 
+    let exitedUnexpectedly = false;
+
     try {
-      while (!stopRequested) {
+      while (!stopRequested && generation === orchestratorGeneration) {
         const snap = await penduloRef.get();
         const session = snap.exists ? snap.data() : null;
         if (!session?.modoManual || !session?.loopManual?.activo) {
+          break;
+        }
+
+        if (session.practicaId && session.practicaId !== activePracticaId) {
+          logger.info('Loop manual: practicaId cambió durante el orquestador, saliendo');
           break;
         }
 
@@ -311,10 +351,10 @@ function startManualTestLoop(mqttClient) {
             estado: 'error',
             ultimoError: err.message,
           });
-          if (stopRequested) break;
+          if (stopRequested || generation !== orchestratorGeneration) break;
         }
 
-        if (stopRequested) break;
+        if (stopRequested || generation !== orchestratorGeneration) break;
 
         const freshSnap = await penduloRef.get();
         const fresh = freshSnap.exists ? freshSnap.data() : null;
@@ -332,15 +372,48 @@ function startManualTestLoop(mqttClient) {
           `Loop manual: próximo ciclo ${cycleNumber + 1} en ${intervalMs / 60000} min`,
         );
 
-        await scheduleNextCycle(intervalMs);
-        if (stopRequested) break;
+        try {
+          await scheduleNextCycle(intervalMs, signal);
+        } catch (err) {
+          if (err.message === 'aborted') break;
+          throw err;
+        }
+
+        if (stopRequested || generation !== orchestratorGeneration) break;
 
         cycleNumber += 1;
         await patchLoopManual(penduloRef, { cicloActual: cycleNumber, estado: 'iniciando' });
       }
+
+      exitedUnexpectedly =
+        !stopRequested &&
+        generation === orchestratorGeneration;
     } finally {
-      orchestrating = false;
-      abortController = null;
+      if (generation === orchestratorGeneration) {
+        orchestrating = false;
+        abortController = null;
+
+        if (exitedUnexpectedly) {
+          try {
+            const snap = await penduloRef.get();
+            const session = snap.exists ? snap.data() : null;
+            if (session?.modoManual && session?.loopManual?.activo) {
+              const ultimoError =
+                session.loopManual?.ultimoError ||
+                'El orquestador del loop se detuvo inesperadamente';
+              await patchLoopManual(penduloRef, {
+                activo: false,
+                estado: 'detenido',
+                ultimoError,
+                proximoCicloEn: null,
+              });
+              logger.warn(`Loop manual: orquestador detenido con sesión activa (${ultimoError})`);
+            }
+          } catch (err) {
+            logger.error('Loop manual: no se pudo marcar loop como detenido:', err.message);
+          }
+        }
+      }
     }
   };
 
@@ -351,10 +424,15 @@ function startManualTestLoop(mqttClient) {
 
       if (shouldRun && !orchestrating) {
         logger.info('Loop manual: sesión activa detectada, iniciando orquestador');
-        void runOrchestrator(data);
+        startOrchestrator(data);
+      } else if (shouldRun && orchestrating && needsOrchestratorRestart(data)) {
+        logger.info('Loop manual: reinicio de sesión detectado, reiniciando orquestador');
+        stopOrchestrator();
+        startOrchestrator(data);
       } else if (!shouldRun && orchestrating) {
         logger.info('Loop manual: sesión detenida, cancelando orquestador');
         stopOrchestrator();
+        activePracticaId = null;
       }
     },
     (err) => {
