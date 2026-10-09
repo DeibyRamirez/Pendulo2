@@ -28,6 +28,8 @@ import { usePendulos } from "@/hooks/usePendulos"
 import { useAuth } from "@/hooks/useAuth"
 import { getDashboardPathByRole } from "@/lib/roles"
 import { CameraStream } from "@/components/camera-stream"
+import { IconoPendulo } from "@/components/IconoPendulo"
+import { NOMBRE_PROYECTO, NOMBRE_RED } from "@/lib/marca"
 import { usePenduloData, type LecturaPendulo } from "@/hooks/usePenduloData"
 import { escucharLecturasPractica } from "@/app/services/penduloDataService"
 import { count } from "console"
@@ -244,15 +246,11 @@ export default function PenduloPublicoPage({
         <div className="container mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="4" r="2" />
-                <line x1="12" y1="6" x2="12" y2="16" />
-                <circle cx="12" cy="18" r="3" fill="currentColor" />
-              </svg>
+              <IconoPendulo className="w-6 h-6 text-primary" />
             </div>
             <div>
               <h1 className="font-semibold">Péndulo {penduloId}</h1>
-              <p className="text-xs text-muted-foreground">World Pendulum Alliance</p>
+              <p className="text-xs text-muted-foreground">{NOMBRE_PROYECTO}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -513,10 +511,10 @@ export default function PenduloPublicoPage({
 
         <div className="mt-12 text-center">
           <p className="text-sm text-muted-foreground mb-2">
-            Este péndulo forma parte de la red World Pendulum Alliance (WPA)
+            Este péndulo forma parte de la {NOMBRE_RED}
           </p>
           <p className="text-xs text-muted-foreground">
-            Proyecto financiado por Erasmus+ | Convenio UAC - Universidad de los Andes
+            Convenio UAC - Universidad de los Andes
           </p>
         </div>
       </main>

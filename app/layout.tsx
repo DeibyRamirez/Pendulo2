@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/hooks/useAuth'
+import { NOMBRE_PROYECTO } from '@/lib/marca'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -13,7 +14,7 @@ export const viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'World Pendulum Alliance | UAC',
+  title: `${NOMBRE_PROYECTO} | UAC`,
   description: 'Plataforma de laboratorio remoto para experimentos con péndulo físico - Corporación Universitaria Autónoma del Cauca',
   generator: 'v0.app',
   icons: {

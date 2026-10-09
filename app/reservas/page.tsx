@@ -1,8 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { ProtectedRoute } from "@/components/ProtectedRoute"
+import { obtenerRutaInicioPorRol } from "@/lib/rutas"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -16,6 +19,7 @@ import {
   Info,
   Loader2,
   AlertCircle,
+  ArrowLeft,
 } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import {
@@ -322,13 +326,25 @@ export default function ReservasPage({ embedded = false }: { embedded?: boolean 
   const misReservasPropias = misReservasActivas.filter((r) => r.usuario_id === user?.uid)
 
   return (
-    <main className={embedded ? "bg-background" : "min-h-screen bg-background"}>
-      {!embedded && <Header />}
+    <ProtectedRoute requiredRole="Estudiante">
+      <main className={embedded ? "bg-background" : "min-h-screen bg-background"}>
+        {!embedded && <Header />}
 
-      <div className={embedded ? "p-4 md:p-6" : "pt-24 pb-16"}>
-        <div className="mx-auto max-w-7xl px-0 sm:px-2 lg:px-8">
+        <div className={embedded ? "p-4 md:p-6" : "pt-24 pb-16"}>
+          <div className="mx-auto max-w-7xl px-0 sm:px-2 lg:px-8">
 
-          {/* Header */}
+            {!embedded && (
+              <div className="mb-6">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={obtenerRutaInicioPorRol(rol)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Volver al panel
+                  </Link>
+                </Button>
+              </div>
+            )}
+
+            {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground">
               {esDocenteOAdmin ? "Gestión de Reservas" : "Reservar Sesión"}
@@ -665,5 +681,6 @@ export default function ReservasPage({ embedded = false }: { embedded?: boolean 
 
       {!embedded && <Footer />}
     </main>
+    </ProtectedRoute>
   )
 }

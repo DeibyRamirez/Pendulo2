@@ -6,6 +6,7 @@ import {
   Globe, 
   Shield 
 } from "lucide-react"
+import { NOMBRE_RED } from "@/lib/marca"
 
 const features = [
   {
@@ -31,7 +32,7 @@ const features = [
   {
     icon: Globe,
     title: "Acceso Global",
-    description: "Conecta desde cualquier lugar con Internet. Forma parte de la World Pendulum Alliance y colabora con universidades de todo el mundo.",
+    description: `Conecta desde cualquier lugar con Internet. Forma parte de la ${NOMBRE_RED} y colabora con universidades de todo el mundo.`,
   },
   {
     icon: Shield,

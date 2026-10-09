@@ -203,7 +203,7 @@ export default function DashboardDocentePage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Globe className="w-5 h-5 text-primary" />
-                  Mapa de Péndulos WPA
+                  Mapa de Péndulos
                 </CardTitle>
                 <CardDescription>Visualiza los nodos de la red y abre cada péndulo</CardDescription>
               </CardHeader>

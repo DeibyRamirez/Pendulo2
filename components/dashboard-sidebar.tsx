@@ -12,6 +12,8 @@ import {
   ClipboardList,
 } from "lucide-react"
 import { useModuloEvaluacion } from "@/hooks/useModuloEvaluacion"
+import { IconoPendulo } from "@/components/IconoPendulo"
+import { SIGLA_PROYECTO } from "@/lib/marca"
 import {
   Sidebar,
   SidebarContent,
@@ -78,10 +80,10 @@ export function DashboardSidebar() {
             <SidebarMenuButton size="lg" asChild>
               <Link href="/" onClick={() => isMobile && setOpenMobile(false)}>
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
-                  <Activity className="h-4 w-4 text-sidebar-primary-foreground" />
+                  <IconoPendulo className="h-4 w-4 text-sidebar-primary-foreground" />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">WPA</span>
+                  <span className="font-semibold">{SIGLA_PROYECTO}</span>
                   <span className="text-xs text-muted-foreground">Dashboard</span>
                 </div>
               </Link>

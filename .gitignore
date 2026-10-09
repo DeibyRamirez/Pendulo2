@@ -23,3 +23,6 @@ serviceAccount*.json
 node_modules/
 .next/
 .DS_Store
+
+# Artefactos de despliegue (no versioneados)
+*.tar.gz

@@ -1,10 +1,10 @@
-# Generador de manuales WPA
+# Generador de manuales PPI
 
 Script aislado (no modifica el `package.json` de la aplicación web) que
 produce los dos documentos Word de `docs/`:
 
-- `docs/Manual_de_Usuario_WPA.docx`
-- `docs/Manual_Tecnico_WPA.docx`
+- `docs/Manual_de_Usuario_PPI.docx`
+- `docs/Manual_Tecnico_PPI.docx`
 
 ```bash
 cd scripts/documentacion

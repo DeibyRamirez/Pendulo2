@@ -1,7 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Activity, ChevronDown, CircleHelp, Facebook, Globe, Instagram, ListChecks } from "lucide-react"
+import { ChevronDown, CircleHelp, Facebook, Globe, Instagram, ListChecks } from "lucide-react"
+import { IconoPendulo } from "@/components/IconoPendulo"
+import { NOMBRE_PROYECTO, SIGLA_PROYECTO } from "@/lib/marca"
 
 const socialLinks = [
   { name: "Página principal UAC", href: "https://www.uniautonoma.edu.co", icon: Globe },
@@ -43,10 +45,10 @@ export function Footer() {
           <div className="lg:col-span-1">
             <div className="flex items-center gap-2 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-                <Activity className="h-6 w-6 text-primary-foreground" />
+                <IconoPendulo className="h-6 w-6 text-primary-foreground" />
               </div>
               <div className="flex flex-col">
-                <span className="text-lg font-bold text-foreground">WPA</span>
+                <span className="text-lg font-bold text-foreground">{SIGLA_PROYECTO}</span>
                 <span className="text-xs text-muted-foreground">UAC</span>
               </div>
             </div>
@@ -139,11 +141,10 @@ export function Footer() {
 
         <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-sm text-muted-foreground">
-            {new Date().getFullYear()} World Pendulum Alliance. Todos los derechos reservados.
+            {new Date().getFullYear()} {NOMBRE_PROYECTO}. Todos los derechos reservados.
           </p>
           <div className="flex items-center gap-6 text-xs text-muted-foreground">
             <span>Corporación Universitaria Autónoma del Cauca</span>
-            <span>Erasmus+</span>
           </div>
         </div>
       </div>

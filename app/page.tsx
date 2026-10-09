@@ -4,6 +4,7 @@ import { FeaturesSection } from "@/components/features-section"
 import { StatsSection } from "@/components/stats-section"
 import { AboutSection } from "@/components/about-section"
 import { Footer } from "@/components/footer"
+import { BurbujaChatFlotante } from "@/components/chat/BurbujaChatFlotante"
 
 export default function Home() {
   return (
@@ -14,6 +15,7 @@ export default function Home() {
       <FeaturesSection />
       <AboutSection />
       <Footer />
+      <BurbujaChatFlotante />
     </main>
   )
 }

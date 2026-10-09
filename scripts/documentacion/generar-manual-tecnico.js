@@ -27,7 +27,7 @@ function cuerpoManualTecnico() {
     titulo1("1. Introducción técnica"),
     titulo2("1.1 Propósito del documento"),
     parrafo(
-      "Este Manual Técnico describe la arquitectura, el stack, el modelo de datos, las integraciones externas, la cadena IoT y los procedimientos de despliegue de la plataforma World Pendulum Alliance (WPA). Está dirigido a desarrolladores, docentes técnicos, administradores de laboratorio y jurados académicos que deban evaluar o mantener el sistema."
+      "Este Manual Técnico describe la arquitectura, el stack, el modelo de datos, las integraciones externas, la cadena IoT y los procedimientos de despliegue de la plataforma Proyecto Péndulos Interconectados (PPI). Está dirigido a desarrolladores, docentes técnicos, administradores de laboratorio y jurados académicos que deban evaluar o mantener el sistema."
     ),
     parrafo(
       "La fuente de verdad es el repositorio de software (aplicación Next.js, reglas de Firestore y proceso pendulo-bridge). No se incluyen secretos reales: las credenciales se documentan solo como nombres de variables, con referencia a los archivos de ejemplo .env.example y bridge/.env.example."
@@ -37,7 +37,7 @@ function cuerpoManualTecnico() {
     tabla(
       ["Elemento", "Valor"],
       [
-        ["Nombre visible", "World Pendulum Alliance | UAC"],
+        ["Nombre visible", "Proyecto Péndulos Interconectados | UAC"],
         ["Descripción", "Plataforma de laboratorio remoto para experimentos con péndulo físico"],
         ["Institución", "Corporación Universitaria Autónoma del Cauca"],
         ["Proyecto Firebase", "pendulo-cd66e (identificador de CLI; no es una clave secreta)"],
@@ -66,13 +66,13 @@ function cuerpoManualTecnico() {
       "                                      ⇄  Node-RED  →  UART  →  dsPIC",
       "Cámara MJPEG: Raspberry Pi → Cloudflare Tunnel → navegador (no pasa por Firestore)",
     ]),
-    pieFigura("Figura 1. Cadena de componentes de WPA. La web y el hardware solo se encuentran en Firestore, salvo la cámara."),
+    pieFigura("Figura 1. Cadena de componentes de PPI. La web y el hardware solo se encuentran en Firestore, salvo la cámara."),
 
     titulo2("2.2 Qué corre en cada lugar"),
     tabla(
       ["Componente", "Dónde", "Tecnología", "Responsabilidad"],
       [
-        ["Web WPA", "Vercel", "Next.js App Router, React 18", "UI, auth, reservas, comandos, visualización"],
+        ["Web PPI", "Vercel", "Next.js App Router, React 18", "UI, auth, reservas, comandos, visualización"],
         ["Firestore + Auth", "Google Cloud", "Firebase", "Identidad, datos y tiempo real"],
         ["pendulo-bridge", "Raspberry Pi", "Node.js 18+, systemd", "MQTT ↔ Firestore 24/7"],
         ["Mosquitto", "Raspberry Pi", "Broker MQTT", "Mensajería local, no pública"],
@@ -283,7 +283,7 @@ function cuerpoManualTecnico() {
     titulo1("7. Integraciones externas"),
     titulo2("7.1 Inventario"),
     tabla(
-      ["Servicio", "Uso en WPA", "Configuración"],
+      ["Servicio", "Uso en PPI", "Configuración"],
       [
         ["Firebase Auth + Firestore", "Identidad, datos, onSnapshot", "NEXT_PUBLIC_FIREBASE_*"],
         ["Vertex AI (Gemini)", "Agente PhysicsAI", "VERTEX_PROJECT_ID, VERTEX_LOCATION, GOOGLE_SERVICE_ACCOUNT_JSON"],
@@ -481,7 +481,7 @@ function cuerpoManualTecnico() {
     tabla(
       ["Término", "Significado"],
       [
-        ["BaaS", "Backend as a Service; en WPA, Firebase Auth y Firestore."],
+        ["BaaS", "Backend as a Service; en PPI, Firebase Auth y Firestore."],
         ["onSnapshot", "Listener en tiempo real del SDK de Firestore."],
         ["Admin SDK", "SDK privilegiado del bridge; ignora security rules."],
         ["Slot atómico", "Documento de exclusión mutua de un bloque horario."],
@@ -505,7 +505,7 @@ function cuerpoManualTecnico() {
     parrafo(
       "El Manual de Usuario, en la misma carpeta, cubre roles, menús y procedimientos de interfaz. Ambos documentos deben mantenerse en la misma versión (1.0) cuando el sistema cambie de forma incompatible."
     ),
-    parrafo("Fin del Manual Técnico de la plataforma World Pendulum Alliance.", {
+    parrafo("Fin del Manual Técnico de la plataforma Proyecto Péndulos Interconectados.", {
       run: { italics: true, bold: true, color: "0F2C59" },
     }),
   ];
@@ -514,13 +514,13 @@ function cuerpoManualTecnico() {
 async function generarManualTecnico() {
   const documento = construirDocumento({
     titulo: "Arquitectura, tecnologías, datos e integraciones de la plataforma",
-    tituloCorto: "Manual Técnico WPA",
+    tituloCorto: "Manual Técnico PPI",
     tipoDocumento: "MANUAL TÉCNICO",
     descripcionCorta:
-      "Referencia de ingeniería del laboratorio remoto WPA: web, Firebase, bridge MQTT y estación física.",
+      "Referencia de ingeniería del laboratorio remoto PPI: web, Firebase, bridge MQTT y estación física.",
     cuerpo: cuerpoManualTecnico(),
   });
-  return guardarDocumento(documento, "Manual_Tecnico_WPA.docx");
+  return guardarDocumento(documento, "Manual_Tecnico_PPI.docx");
 }
 
 module.exports = { generarManualTecnico };

@@ -1,5 +1,4 @@
-import { Button } from "@/components/ui/button"
-import { ExternalLink } from "lucide-react"
+import { NOMBRE_PROYECTO, NOMBRE_RED } from "@/lib/marca"
 
 export function AboutSection() {
   return (
@@ -12,33 +11,22 @@ export function AboutSection() {
               Acerca del Proyecto
             </p>
             <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl text-balance">
-              World Pendulum Alliance
+              {NOMBRE_PROYECTO}
             </h2>
             <div className="space-y-4 text-muted-foreground leading-relaxed">
               <p>
                 Este proyecto surge en el marco del convenio entre la{" "}
                 <strong className="text-foreground">Corporación Universitaria Autónoma del Cauca</strong> y la{" "}
                 <strong className="text-foreground">Universidad de los Andes (UNIANDES)</strong>, como parte 
-                de la iniciativa internacional World Pendulum Alliance (WPA).
+                de la {NOMBRE_RED} de laboratorios remotos de péndulo físico.
               </p>
               <p>
-                La WPA busca construir una red global de laboratorios remotos basados en péndulos 
+                Esta red busca construir un conjunto global de laboratorios remotos basados en péndulos 
                 físicos, permitiendo que estudiantes y docentes de distintas universidades del 
                 mundo realicen experimentos científicos en tiempo real desde cualquier lugar 
                 con conexión a Internet.
               </p>
-              <p>
-                Financiado por el programa <strong className="text-foreground">Erasmus+</strong> de la 
-                Unión Europea, este proyecto representa un paso importante hacia la democratización 
-                de la educación científica experimental.
-              </p>
             </div>
-            <Button variant="outline" asChild>
-              <a href="https://www.worldpendulumalliance.org" target="_blank" rel="noopener noreferrer">
-                Conocer más sobre WPA
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </a>
-            </Button>
           </div>
 
           {/* Right - Architecture diagram */}

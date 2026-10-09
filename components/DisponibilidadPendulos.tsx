@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePendulos } from '@/hooks/usePendulos';
 import { Card } from '@/components/ui/card';
+import { NOMBRE_RED } from '@/lib/marca';
 
 export default function DisponibilidadPendulos() {
   const { pendulos, loading, error } = usePendulos();
@@ -91,7 +92,7 @@ export default function DisponibilidadPendulos() {
     <Card className="w-full">
       <div className="p-6">
         <h2 className="text-2xl font-bold mb-6 text-gray-900">
-          Estado de Péndulos en la Red WPA
+          Estado de Péndulos en la {NOMBRE_RED}
         </h2>
 
         {/* Estadísticas rápidas */}

@@ -1,11 +1,12 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Play, ChevronLeft, ChevronRight } from "lucide-react"
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { usePendulos } from "@/hooks/usePendulos"
 import { QRCodeSVG } from "qrcode.react"
+import { IndicadoresUltimaPrueba } from "@/components/IndicadoresUltimaPrueba"
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pendulo2.vercel.app/"
 
@@ -68,12 +69,6 @@ export function HeroSection() {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link href="#demo">
-                  <Play className="mr-2 h-4 w-4" />
-                  Ver demostración
-                </Link>
-              </Button>
             </div>
 
             {/* Partner logos */}
@@ -91,53 +86,33 @@ export function HeroSection() {
                   <span className="text-sm font-semibold text-foreground">UNIANDES</span>
                   <span className="text-xs text-muted-foreground">Universidad de los Andes</span>
                 </div>
-                <div className="h-8 w-px bg-border hidden sm:block" />
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-foreground">Erasmus+</span>
-                  <span className="text-xs text-muted-foreground">Unión Europea</span>
-                </div>
               </div>
             </div>
           </div>
 
           {/* Right content - Pendulum visualization */}
-          <div className="relative">
+          <div className="relative flex flex-col gap-6">
             <div className="relative aspect-square rounded-2xl border border-border bg-card p-8 overflow-hidden">
               {/* Animated pendulum visualization */}
-              <div className="absolute inset-0 flex items-start justify-center pt-8">
-                <div className="relative">
+              <div className="absolute inset-0 flex items-start justify-center pt-2">
+                <div className="relative flex flex-col items-center">
                   {/* Pivot point */}
                   <div className="h-4 w-4 rounded-full bg-primary" />
 
-                  {/* Pendulum arm and bob */}
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 origin-top animate-pendulum">
-                    <div className="h-48 w-0.5 bg-gradient-to-b from-primary to-primary/50" />
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 h-12 w-12 rounded-full bg-primary shadow-lg shadow-primary/50" />
+                  {/* Pendulum arm and bob: giran desde el anclaje superior */}
+                  <div className="-mt-2 flex flex-col items-center origin-top animate-pendulum">
+                    <div className="h-64 w-0.5 bg-gradient-to-b from-primary to-primary/50" />
+                    <div className="h-12 w-12 rounded-full bg-primary shadow-lg shadow-primary/50" />
                   </div>
 
                   {/* Motion trail */}
-                  <div className="absolute top-52 left-1/2 -translate-x-1/2 h-0.5 w-40 bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                  <div className="absolute top-[288px] left-1/2 -translate-x-1/2 h-0.5 w-40 bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
                 </div>
               </div>
-
-              {/* Data overlay cards */}
-              <div className="absolute bottom-4 left-4 right-4 flex gap-4">
-                <div className="flex-1 rounded-lg border border-border bg-background/80 backdrop-blur-sm p-3">
-                  <p className="text-xs text-muted-foreground">Ángulo</p>
-                  <p className="text-xl font-bold text-foreground">15.7°</p>
-                </div>
-                <div className="flex-1 rounded-lg border border-border bg-background/80 backdrop-blur-sm p-3">
-                  <p className="text-xs text-muted-foreground">Velocidad</p>
-                  <p className="text-xl font-bold text-foreground">0.42 m/s</p>
-                </div>
-                <div className="flex-1 rounded-lg border border-border bg-background/80 backdrop-blur-sm p-3">
-                  <p className="text-xs text-muted-foreground">Período</p>
-                  <p className="text-xl font-bold text-foreground">2.01 s</p>
-                </div>
-              </div>
-
 
             </div>
+
+            <IndicadoresUltimaPrueba />
           </div>
 
         </div>

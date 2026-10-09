@@ -12,6 +12,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { IconoPendulo } from "@/components/IconoPendulo"
+import { NOMBRE_PROYECTO, NOMBRE_RED, SIGLA_PROYECTO } from "@/lib/marca"
 
 export default function LoginPage() {
   const router = useRouter();
@@ -155,15 +157,11 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-7 h-7 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="4" r="2" />
-                <line x1="12" y1="6" x2="12" y2="16" />
-                <circle cx="12" cy="18" r="3" fill="currentColor" />
-              </svg>
+              <IconoPendulo className="w-7 h-7 text-primary" />
             </div>
             <div className="text-left">
-              <h1 className="text-xl font-bold text-foreground">WPA</h1>
-              <p className="text-xs text-muted-foreground">World Pendulum Alliance</p>
+              <h1 className="text-xl font-bold text-foreground">{SIGLA_PROYECTO}</h1>
+              <p className="text-xs text-muted-foreground">{NOMBRE_PROYECTO}</p>
             </div>
           </Link>
         </div>
@@ -195,7 +193,7 @@ export default function LoginPage() {
                   required
                 />
                 <p className="text-xs text-muted-foreground">
-                  Solo correos @uniautonoma.edu.co o universidades de la red WPA
+                  Solo correos @uniautonoma.edu.co o universidades de la {NOMBRE_RED}
                 </p>
               </div>
 
@@ -297,7 +295,7 @@ export default function LoginPage() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          World Pendulum Alliance - Erasmus+ | UAC - UNIANDES
+          {NOMBRE_PROYECTO} | UAC - UNIANDES
         </p>
       </div>
     </div>

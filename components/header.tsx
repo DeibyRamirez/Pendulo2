@@ -2,17 +2,19 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Activity, LogOut, Menu, X } from "lucide-react"
+import { LogOut, Menu, X } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
+import { IconoPendulo } from "@/components/IconoPendulo"
+import { NOMBRE_PROYECTO, NOMBRE_RED, SIGLA_PROYECTO } from "@/lib/marca"
 
 const navigation = [
   { name: "Inicio", href: "/" },
   { name: "Dashboard", href: "/dashboard" },
   { name: "Reservas", href: "/reservas" },
   // { name: "Historial", href: "/historial" },
-  { name: "Red WPA", href: "/mapa" },
-  { name: "Acerca de", href: "#about" },
+  { name: NOMBRE_RED, href: "/mapa" },
+  { name: "Acerca de", href: "/#about" },
 ]
 
 export function Header() {
@@ -29,11 +31,11 @@ export function Header() {
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
         <div className="flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <Activity className="h-6 w-6 text-primary-foreground" />
+            <IconoPendulo className="h-6 w-6 text-primary-foreground" />
           </div>
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-foreground">WPA</span>
-            <span className="text-xs text-muted-foreground">World Pendulum Alliance</span>
+            <span className="text-lg font-bold text-foreground">{SIGLA_PROYECTO}</span>
+            <span className="text-xs text-muted-foreground">{NOMBRE_PROYECTO}</span>
           </div>
         </div>
 

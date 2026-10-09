@@ -2,7 +2,7 @@
   "name": "documentacion-wpa",
   "private": true,
   "version": "1.0.0",
-  "description": "Generador aislado de los manuales universitarios WPA en formato Word. No forma parte de la aplicación web.",
+  "description": "Generador aislado de los manuales universitarios PPI en formato Word. No forma parte de la aplicación web.",
   "type": "commonjs",
   "scripts": {
     "generar": "node generar-manuales.js"

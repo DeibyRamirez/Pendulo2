@@ -36,6 +36,7 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { CameraStream } from "@/components/camera-stream"
+import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { useAuth } from "@/hooks/useAuth"
 import { usePenduloData, type LecturaPendulo } from "@/hooks/usePenduloData"
 import { escucharReservacionesUsuario, iniciarPractica, liberarPractica, completarReservacion, hayControlAjenoVigente } from "@/app/services/reservacionService"
@@ -731,6 +732,7 @@ export default function RealtimePage() {
   ).sort((a, b) => a.muestra - b.muestra)
 
   return (
+    <ProtectedRoute requiredRole="Estudiante">
     <div className="p-4 md:p-6 lg:p-8 space-y-6 flex flex-col">
       {/* Header */}
       <div className="order-2 lg:order-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1195,6 +1197,7 @@ export default function RealtimePage() {
         </CardContent>
       </Card>
     </div>
+    </ProtectedRoute>
   )
 }
 

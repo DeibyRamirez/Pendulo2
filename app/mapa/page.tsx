@@ -19,6 +19,8 @@ import {
 import { ArrowLeft, Search, MapPin, Activity, Calendar, Globe, Radio, List } from "lucide-react"
 import { usePendulos } from "@/hooks/usePendulos"
 import { useAuth } from "@/hooks/useAuth"
+import { NOMBRE_RED } from "@/lib/marca"
+import { obtenerRutaInicioPorRol } from "@/lib/rutas"
 
 const MapaLeaflet = dynamic<ComponentProps<typeof MapaLeafletType>>(
   () => import("@/components/mapa-leaflet"),
@@ -45,7 +47,7 @@ type PenduloUI = {
 }
 
 const toCityFromInstitution = (institucion: string) => {
-  if (!institucion) return "Nodo WPA"
+  if (!institucion) return "Nodo de la red"
   return institucion.split(" ").slice(0, 2).join(" ")
 }
 
@@ -162,9 +164,9 @@ function ListaNodosPanel({
   )
 }
 
-export default function MapaWPAPage() {
+export default function PaginaMapaRed() {
   const { pendulos, loading } = usePendulos()
-  const { user } = useAuth()
+  const { user, rol } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedPendulo, setSelectedPendulo] = useState<PenduloUI | null>(null)
   const [listaAbierta, setListaAbierta] = useState(false)
@@ -215,8 +217,8 @@ export default function MapaWPAPage() {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50 shrink-0">
         <div className="container mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            <Link href="/">
-              <Button variant="ghost" size="icon" className="touch-target shrink-0">
+            <Link href={obtenerRutaInicioPorRol(rol)}>
+              <Button variant="ghost" size="icon" className="touch-target shrink-0" aria-label="Volver al panel">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </Link>
@@ -225,7 +227,7 @@ export default function MapaWPAPage() {
                 <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
               </div>
               <div className="min-w-0">
-                <h1 className="font-semibold text-sm sm:text-base truncate">Red WPA</h1>
+                <h1 className="font-semibold text-sm sm:text-base truncate">{NOMBRE_RED}</h1>
                 <p className="text-xs text-muted-foreground hidden sm:block">Mapa global en tiempo real</p>
               </div>
             </div>

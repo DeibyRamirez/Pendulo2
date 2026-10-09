@@ -26,13 +26,13 @@ function cuerpoManualUsuario() {
     titulo1("1. Introducción"),
     titulo2("1.1 Presentación de la plataforma"),
     parrafo(
-      "La plataforma World Pendulum Alliance (WPA) es un laboratorio remoto de péndulo físico desarrollado por la Corporación Universitaria Autónoma del Cauca, en articulación con la Universidad de los Andes y la red internacional Erasmus+. Su propósito es permitir que estudiantes y docentes de instituciones de educación superior realicen experimentos de medición de gravedad, periodo, frecuencia y temperatura sin estar físicamente frente al aparato, desde un navegador web."
+      "La plataforma Proyecto Péndulos Interconectados (PPI) es un laboratorio remoto de péndulo físico desarrollado por la Corporación Universitaria Autónoma del Cauca, en articulación con la Universidad de los Andes. Su propósito es permitir que estudiantes y docentes de instituciones de educación superior realicen experimentos de medición de gravedad, periodo, frecuencia y temperatura sin estar físicamente frente al aparato, desde un navegador web."
     ),
     parrafo(
       "El sistema conecta tres mundos: la interfaz académica (sitio web), la base de datos en tiempo real (Firebase Firestore) y la estación física instalada en laboratorio (Raspberry Pi, broker MQTT, Node-RED y microcontrolador dsPIC). El usuario nunca habla de forma directa con el hardware: reserva un turno, inicia la práctica en su franja y observa lecturas y cámara en vivo mientras el puente técnico traduce órdenes y telemetría."
     ),
     parrafo(
-      "La marca visible de la plataforma es WPA / UAC. El subtítulo institucional de la aplicación es «Plataforma de laboratorio remoto para experimentos con péndulo físico». El péndulo de referencia en producción se identifica como UAC-01."
+      "La marca visible de la plataforma es PPI / UAC. El subtítulo institucional de la aplicación es «Plataforma de laboratorio remoto para experimentos con péndulo físico». El péndulo de referencia en producción se identifica como UAC-01."
     ),
 
     titulo2("1.2 A quién está dirigido este manual"),
@@ -69,7 +69,7 @@ function cuerpoManualUsuario() {
     titulo2("2.1 Objetivos de la plataforma"),
     parrafo("Objetivo general:"),
     parrafo(
-      "Proveer un laboratorio remoto institucional que permita medir magnitudes del péndulo físico (periodo, gravedad, frecuencia y temperatura) de forma reservada, trazable y colaborativa entre universidades de la red WPA."
+      "Proveer un laboratorio remoto institucional que permita medir magnitudes del péndulo físico (periodo, gravedad, frecuencia y temperatura) de forma reservada, trazable y colaborativa entre universidades de la Red de Péndulos."
     ),
     parrafo("Objetivos específicos de la plataforma:"),
     vineta("Garantizar el acceso exclusivo al hardware mediante reservas de 30 minutos y un usuario activo por péndulo."),
@@ -77,7 +77,7 @@ function cuerpoManualUsuario() {
     vineta("Conservar el historial de muestras y permitir su exportación a Excel."),
     vineta("Soportar tres perfiles de responsabilidad académica: Estudiante, Docente y Admin."),
     vineta("Opcionalmente, articular la práctica experimental con grupos, cuestionarios y calificación (0 a 5)."),
-    vineta("Mostrar la red global de nodos WPA en un mapa público."),
+    vineta("Mostrar la red global de nodos en un mapa público."),
 
     titulo2("2.2 Objetivos de este manual"),
     vineta("Describir las responsabilidades de cada rol sin ambigüedad."),
@@ -126,7 +126,7 @@ function cuerpoManualUsuario() {
     vineta("Universidad Nacional de Colombia"),
     vineta("Universitat Politècnica de Catalunya"),
     vineta("Massachusetts Institute of Technology"),
-    vineta("Otra institución de la red WPA"),
+    vineta("Otra institución de la Red de Péndulos"),
 
     titulo2("3.3 Condiciones de la cuenta"),
     vineta("Toda cuenta nueva se crea con rol Estudiante y estado active."),
@@ -194,7 +194,7 @@ function cuerpoManualUsuario() {
       [2400, 1740, 1740, 1740, 1740]
     ),
     espacioDespuesTabla(),
-    pieFigura("Tabla 1. Matriz de funciones de la plataforma WPA según rol."),
+    pieFigura("Tabla 1. Matriz de funciones de la plataforma PPI según rol."),
 
     titulo1("5. Acceso a la plataforma"),
     titulo2("5.1 Registro de una cuenta nueva"),
@@ -243,7 +243,7 @@ function cuerpoManualUsuario() {
         ["/login", "Iniciar Sesión", "Ingreso con correo o Google"],
         ["/registro", "Registrarse", "Alta de cuenta Estudiante"],
         ["/recuperar", "Recuperar contraseña", "Restablecer clave por correo"],
-        ["/mapa", "Red World Pendulum Alliance", "Mapa global de nodos en tiempo real"],
+        ["/mapa", "Red de Péndulos", "Mapa global de nodos en tiempo real"],
         ["/pendulo/[id]", "Ficha del péndulo", "Detalle público y gráficas en vivo"],
         ["/pendulo-publico", "Vista pública / QR", "Consulta alternativa pensada para códigos QR"],
       ],
@@ -251,7 +251,7 @@ function cuerpoManualUsuario() {
     ),
     espacioDespuesTabla(),
     parrafo(
-      "La cabecera pública ofrece: Inicio, Dashboard, Reservas, Red WPA (/mapa), Acerca de, Iniciar Sesión y Registrarse. El pie de página incluye la guía rápida de cuatro pasos y las preguntas frecuentes institucionales."
+      "La cabecera pública ofrece: Inicio, Dashboard, Reservas, Red de Péndulos (/mapa), Acerca de, Iniciar Sesión y Registrarse. El pie de página incluye la guía rápida de cuatro pasos y las preguntas frecuentes institucionales."
     ),
 
     titulo1("6. Guía del estudiante"),
@@ -265,7 +265,7 @@ function cuerpoManualUsuario() {
     vineta("Trabajos asignados — visible solo si el módulo de evaluación está activo."),
     vineta("Mis Reservas — listado de turnos propios."),
     vineta("Historial — prácticas y descargas."),
-    vineta("Mapa de Péndulos WPA — red global."),
+    vineta("Mapa de Péndulos — red global."),
     parrafo(
       "El bloque «Información del Sistema» resume prácticas realizadas, próxima sesión y tiempo total. La barra lateral izquierda (Dashboard) contiene: Dashboard, Tiempo Real, Reservas, Mis Reservas, Historial, Trabajos asignados (condicional), Agente IA y volver al inicio."
     ),
@@ -348,23 +348,23 @@ function cuerpoManualUsuario() {
       "PhysicsAI no mueve el péndulo ni reserva turnos. Es un apoyo pedagógico; la fuente de las mediciones sigue siendo el hardware y el historial de Firestore."
     ),
 
-    titulo2("6.8 Mapa de la red WPA"),
+    titulo2("6.8 Mapa de la Red de Péndulos"),
     parrafo(
-      "Ruta: /mapa. Título: «Red World Pendulum Alliance». Subtítulo: «Mapa global en tiempo real». Indicadores: Total Nodos, Disponibles y listado «Péndulos de la Red»."
+      "Ruta: /mapa. Título: «Red de Péndulos». Subtítulo: «Mapa global en tiempo real». Indicadores: Total Nodos, Disponibles y listado «Péndulos de la Red»."
     ),
     parrafo("Estados visibles de un nodo: Disponible, En uso, Mantenimiento e Inactivo. Al seleccionar un marcador se puede abrir la ficha pública /pendulo/[id] con gráficas en vivo de esa estación."),
 
     titulo1("7. Guía del docente"),
     titulo2("7.1 Panel docente"),
     parrafo(
-      "Ruta: /docente. Saludo: «Bienvenido, Prof. {nombre}». La barra superior muestra la marca WPA / Docente, el nombre, la institución y el botón «Salir»."
+      "Ruta: /docente. Saludo: «Bienvenido, Prof. {nombre}». La barra superior muestra la marca PPI / Docente, el nombre, la institución y el botón «Salir»."
     ),
     parrafo("Tarjetas y accesos:"),
     vineta("Grupos de trabajo — administración de cursos y miembros."),
     vineta("Péndulo en Vivo — observación de la estación."),
     vineta("Gestionar Reservas — calendario con todas las reservas (título «Gestión de Reservas»)."),
     vineta("Excel de muestras — libro de dos hojas (propias y globales del péndulo, con nombre)."),
-    vineta("Historial y Mapa de Péndulos WPA."),
+    vineta("Historial y Mapa de Péndulos."),
     parrafo(
       "El bloque «Estadísticas de Clase» resume estudiantes, asignaciones, entregas y grupos. Si el módulo de evaluación está apagado, las funciones plus (grupos, trabajos y Excel de entregas) no se ofrecen."
     ),
@@ -396,9 +396,9 @@ function cuerpoManualUsuario() {
     ),
 
     titulo1("8. Guía del administrador"),
-    titulo2("8.1 Panel Admin WPA"),
+    titulo2("8.1 Panel Admin PPI"),
     parrafo(
-      "Ruta: /admin. Título: «Panel Admin WPA». Subtítulo: «Gestión completa de la plataforma». El subtítulo de rol es Administrador."
+      "Ruta: /admin. Título: «Panel Admin PPI». Subtítulo: «Gestión completa de la plataforma». El subtítulo de rol es Administrador."
     ),
     parrafo("Elementos permanentes:"),
     vineta("Tarjeta Módulo de evaluación (interruptor global)."),
@@ -474,7 +474,7 @@ function cuerpoManualUsuario() {
     tabla(
       ["Elemento", "Ruta / ubicación", "Función"],
       [
-        ["Panel Admin WPA", "/admin", "Gestión completa"],
+        ["Panel Admin PPI", "/admin", "Gestión completa"],
         ["Péndulos", "Pestaña en /admin", "Alta y edición de estaciones"],
         ["Gestión de usuarios", "Pestaña en /admin", "Rol y estado"],
         ["Todas reservaciones", "Pestaña en /admin", "Auditoría de turnos"],
@@ -571,9 +571,9 @@ function cuerpoManualUsuario() {
 
     titulo1("13. Glosario"),
     tabla(
-      ["Término", "Definición en WPA"],
+      ["Término", "Definición en PPI"],
       [
-        ["Péndulo / nodo WPA", "Estación física remota con identificador (ejemplo UAC-01), institución y coordenadas."],
+        ["Péndulo / nodo PPI", "Estación física remota con identificador (ejemplo UAC-01), institución y coordenadas."],
         ["Práctica", "Corrida experimental identificada por practicaId (uid y marca de tiempo)."],
         ["Reservación", "Franja de 30 minutos con estados pending, active, completed o cancelled."],
         ["Slot", "Bloque horario atómico (péndulo + fecha + hora) almacenado en slots_ocupados."],
@@ -596,12 +596,12 @@ function cuerpoManualUsuario() {
 
     titulo1("14. Referencias de la interfaz y cierre"),
     parrafo(
-      "Los textos citados en este manual (títulos de tarjetas, badges, FAQ del pie de página y nombres de menú) corresponden a la interfaz en español de la aplicación WPA. La guía rápida institucional resume el ciclo en cuatro acciones: registrarse, agendar 30 minutos, iniciar en Tiempo Real y exportar desde Historial."
+      "Los textos citados en este manual (títulos de tarjetas, badges, FAQ del pie de página y nombres de menú) corresponden a la interfaz en español de la aplicación PPI. La guía rápida institucional resume el ciclo en cuatro acciones: registrarse, agendar 30 minutos, iniciar en Tiempo Real y exportar desde Historial."
     ),
     parrafo(
       "Para arquitectura, tecnologías, colecciones de datos, MQTT, cámara y despliegue, consulte el Manual Técnico de la misma carpeta de documentación. Ambos documentos comparten versión 1.0 y fecha de septiembre de 2026."
     ),
-    parrafo("Fin del Manual de Usuario de la plataforma World Pendulum Alliance.", {
+    parrafo("Fin del Manual de Usuario de la plataforma Proyecto Péndulos Interconectados.", {
       run: { italics: true, bold: true, color: "0F2C59" },
     }),
   ];
@@ -610,13 +610,13 @@ function cuerpoManualUsuario() {
 async function generarManualUsuario() {
   const documento = construirDocumento({
     titulo: "Plataforma de laboratorio remoto — procedimientos, roles y funciones",
-    tituloCorto: "Manual de Usuario WPA",
+    tituloCorto: "Manual de Usuario PPI",
     tipoDocumento: "MANUAL DE USUARIO",
     descripcionCorta:
-      "Guía operativa para estudiantes, docentes y administradores de la red World Pendulum Alliance.",
+      "Guía operativa para estudiantes, docentes y administradores de la Red de Péndulos.",
     cuerpo: cuerpoManualUsuario(),
   });
-  return guardarDocumento(documento, "Manual_de_Usuario_WPA.docx");
+  return guardarDocumento(documento, "Manual_de_Usuario_PPI.docx");
 }
 
 module.exports = { generarManualUsuario };

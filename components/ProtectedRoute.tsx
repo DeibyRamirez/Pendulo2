@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getDashboardPathByRole, hasRequiredRole, type UserRole } from "@/lib/roles";
 
+// Nota: esta protección es SOLO del lado del cliente (evita mostrar la UI a
+// quien no tiene sesión o rol suficiente). No es una frontera de seguridad:
+// la autorización real de los datos depende de firestore.rules.
+
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: UserRole;

@@ -38,6 +38,7 @@ import {
   crearPendulo,
   escucharTodosPendulos,
 } from "@/app/services/penduloService";
+import { SIGLA_PROYECTO } from "@/lib/marca";
 import {
   actualizarEstadoUsuario,
   actualizarRolUsuario,
@@ -251,7 +252,7 @@ export default function DashboardAdminPage() {
         <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-foreground truncate">Panel Admin WPA</h1>
+              <h1 className="text-lg font-bold text-foreground truncate">Panel Admin {SIGLA_PROYECTO}</h1>
               <p className="text-xs text-muted-foreground">Gestión completa de la plataforma</p>
             </div>
             <div className="hidden lg:flex items-center gap-4">
@@ -261,7 +262,17 @@ export default function DashboardAdminPage() {
               </div>
               <Button asChild variant="outline" size="sm">
                 <Link href="/mapa">
-                  <Globe className="w-4 h-4 mr-2" /> Ver mapa WPA
+                  <Globe className="w-4 h-4 mr-2" /> Ver mapa de la red
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/reservas">
+                  <CalendarClock className="w-4 h-4 mr-2" /> Reservas
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/historial">
+                  <BarChart3 className="w-4 h-4 mr-2" /> Historial
                 </Link>
               </Button>
               <Button variant="destructive" size="sm" onClick={logout}>
@@ -285,7 +296,17 @@ export default function DashboardAdminPage() {
                   </div>
                   <Button asChild variant="outline" className="w-full touch-target" onClick={() => setMobileNavOpen(false)}>
                     <Link href="/mapa">
-                      <Globe className="w-4 h-4 mr-2" /> Ver mapa WPA
+                      <Globe className="w-4 h-4 mr-2" /> Ver mapa de la red
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="w-full touch-target" onClick={() => setMobileNavOpen(false)}>
+                    <Link href="/reservas">
+                      <CalendarClock className="w-4 h-4 mr-2" /> Reservas
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="w-full touch-target" onClick={() => setMobileNavOpen(false)}>
+                    <Link href="/historial">
+                      <BarChart3 className="w-4 h-4 mr-2" /> Historial
                     </Link>
                   </Button>
                   <Button variant="destructive" className="w-full touch-target" onClick={() => { setMobileNavOpen(false); logout(); }}>

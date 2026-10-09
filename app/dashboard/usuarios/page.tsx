@@ -25,6 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ProtectedRoute } from "@/components/ProtectedRoute"
 
 type UserRole = "admin" | "docente" | "estudiante"
 
@@ -74,6 +75,7 @@ export default function UsuariosPage() {
   }
 
   return (
+    <ProtectedRoute requiredRole="Admin">
     <div className="p-6 lg:p-8 space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -268,5 +270,6 @@ export default function UsuariosPage() {
         </CardContent>
       </Card>
     </div>
+    </ProtectedRoute>
   )
 }
