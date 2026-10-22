@@ -57,6 +57,10 @@ async function validarSesionInstitucional(user) {
  * @param {string} password - Contraseña del usuario
  * @returns {Promise} Credencial de Firebase con el usuario autenticado
  */
+export function esperarAuthListo() {
+  return auth.authStateReady();
+}
+
 export async function iniciarSesion(email, password) {
   const credencial = await signInWithEmailAndPassword(auth, email, password);
   return credencial;

@@ -11,6 +11,7 @@ import { Timestamp } from "firebase/firestore";
 import { useReservations } from "@/hooks/useReservations";
 import { listarPracticasDeUsuario } from "@/app/services/penduloDataService";
 import { useModuloEvaluacion } from "@/hooks/useModuloEvaluacion";
+import { marcarTiempo } from "@/lib/marcarTiempo";
 
 const PENDULO_PREDETERMINADO = "UAC-01";
 
@@ -43,21 +44,38 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user?.uid) return;
     let cancelado = false;
-    listarPracticasDeUsuario(user.uid, penduloIds)
-      .then((data: { practicaId: string }[]) => {
-        if (!cancelado) setPracticasRealizadas(data.length);
-      })
-      .catch(() => {
-        if (!cancelado) {
-          const desdeReservas = reservaciones.reduce(
-            (acc, r) => acc + (r.practicas_realizadas ?? 0),
-            0,
-          );
-          setPracticasRealizadas(desdeReservas);
-        }
-      });
+    const uid = user.uid;
+    const cargar = () => {
+      const inicio = marcarTiempo("practicas-inicio");
+      listarPracticasDeUsuario(uid, penduloIds)
+        .then((data: { practicaId: string }[]) => {
+          if (!cancelado) setPracticasRealizadas(data.length);
+        })
+        .catch(() => {
+          if (!cancelado) {
+            const desdeReservas = reservaciones.reduce(
+              (acc, r) => acc + (r.practicas_realizadas ?? 0),
+              0,
+            );
+            setPracticasRealizadas(desdeReservas);
+          }
+        })
+        .finally(() => {
+          if (!cancelado) marcarTiempo("practicas-fin", inicio);
+        });
+    };
+    // El saludo ya está en pantalla; las prácticas no compiten con el primer pintado.
+    let idleId: number | undefined;
+    let timerId: number | undefined;
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(cargar, { timeout: 1500 });
+    } else {
+      timerId = window.setTimeout(cargar, 1);
+    }
     return () => {
       cancelado = true;
+      if (idleId != null) window.cancelIdleCallback(idleId);
+      if (timerId != null) window.clearTimeout(timerId);
     };
   }, [user?.uid, penduloIds, reservaciones]);
 
@@ -211,7 +229,7 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Globe className="w-5 h-5 text-primary" />
-                  Mapa de Péndulos WPA
+                  Mapa de Péndulos
                 </CardTitle>
                 <CardDescription>
                   Explora los péndulos de la red y abre cada nodo
@@ -233,39 +251,6 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Live Preview Section
-          <Card className="mb-8 border-border/50">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Péndulo en Tiempo Real</CardTitle>
-                  <CardDescription>Datos actuales del sistema</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-sm text-muted-foreground">En vivo</span>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <PendulumChart />
-              <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">15.7°</p>
-                  <p className="text-sm text-muted-foreground">Ángulo actual</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">0.42 m/s</p>
-                  <p className="text-sm text-muted-foreground">Velocidad</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">2.01 s</p>
-                  <p className="text-sm text-muted-foreground">Período</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card> */}
 
           {/* Información del Sistema */}
           <Card className="border-border/50 bg-card/30">

@@ -1,19 +1,11 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Bot, Send, Trash2, Atom, Zap, BookOpen, ChevronDown } from "lucide-react"
+import { Send, Trash2, Atom, Zap, BookOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-
-// -----------------------------------------------------------
-// TYPES
-// -----------------------------------------------------------
-interface Message {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  timestamp: Date
-}
+import { ProtectedRoute } from "@/components/ProtectedRoute"
+import { useChatIA } from "@/hooks/useChatIA"
+import { MensajeChat } from "@/components/chat/MensajeChat"
 
 // -----------------------------------------------------------
 // SUGGESTED QUESTIONS
@@ -30,17 +22,15 @@ const SUGGESTIONS = [
 // COMPONENT
 // -----------------------------------------------------------
 export default function AgenteIAPage() {
-  const [messages, setMessages] = useState<Message[]>([])
+  const { mensajes, enviarMensaje, cargando, error, limpiarChat } = useChatIA()
   const [input, setInput] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, loading])
+  }, [mensajes, cargando])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -50,62 +40,12 @@ export default function AgenteIAPage() {
     ta.style.height = `${Math.min(ta.scrollHeight, 140)}px`
   }, [input])
 
-  // Enviar MENSAJE -> POST /api/chat
+  // Enviar MENSAJE -> POST /api/chat (con ID token, vía useChatIA)
   const sendMessage = async (text: string = input) => {
-    const trimed = text.trim()
-    if (!trimed || loading) return
-
-
-    // Agregar mensaje del usuario
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: trimed,
-      timestamp: new Date(),
-    }
-
-
-    const updateMessages = [...messages, userMsg]
-    setMessages(updateMessages)
+    const limpio = text.trim()
+    if (!limpio) return
     setInput("")
-    setLoading(true)
-    setError(null)
-
-    try {
-
-      // Llamada a la API interna que a su vez llama a Gemini
-      // Aquí es donde se maneja la lógica de comunicación con el backend y la API de Gemini
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: updateMessages.map((m) => ({ role: m.role, content: m.content })), }),
-      })
-
-      // Manejo de errores HTTP
-      if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData?.error ?? `HTTP ${res.status}`)
-      }
-
-
-      const data = await res.json()
-
-
-      // Agregar mensaje del asistente
-      const assistantMsg: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: data.reply,
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, assistantMsg])
-
-
-    } catch (err: any) {
-      setError(err.message ?? "Error desconocido")
-    } finally {
-      setLoading(false)
-    }
+    await enviarMensaje(limpio)
   }
 
 
@@ -117,17 +57,13 @@ export default function AgenteIAPage() {
     }
   }
 
-  const clearChat = () => {
-    setMessages([])
-    setError(null)
-  }
-
-  const isEmpty = messages.length === 0
+  const isEmpty = mensajes.length === 0
 
   // -----------------------------------------------------------
   // RENDER
   // -----------------------------------------------------------
   return (
+    <ProtectedRoute requiredRole="Estudiante">
     <div className="flex flex-col min-h-[calc(100dvh-3.5rem)] max-h-[calc(100dvh-3.5rem)] md:min-h-[calc(100dvh)] md:max-h-[calc(100dvh)] bg-background overflow-hidden">
 
       {/* ── HEADER ── */}
@@ -147,15 +83,15 @@ export default function AgenteIAPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="hidden sm:flex items-center gap-1.5 rounded-full border border-[rgb(62_224_143/0.35)] bg-[rgb(62_224_143/0.12)] px-2.5 py-1 font-mono text-[.6875rem] uppercase tracking-[.14em] text-[var(--color-ok)]">
+            <span className="latido h-1.5 w-1.5 rounded-full bg-[var(--color-ok)]" />
             En línea
           </span>
-          {messages.length > 0 && (
+          {mensajes.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={clearChat}
+              onClick={limpiarChat}
               className="text-muted-foreground hover:text-destructive gap-1.5"
             >
               <Trash2 className="h-4 w-4" />
@@ -200,12 +136,12 @@ export default function AgenteIAPage() {
         )}
 
         {/* Lista de mensajes */}
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+        {mensajes.map((msg) => (
+          <MensajeChat key={msg.id} mensaje={msg} />
         ))}
 
         {/* Indicador de escritura */}
-        {loading && (
+        {cargando && (
           <div className="flex items-start gap-3 max-w-3xl mx-auto w-full">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 shrink-0 mt-0.5">
               <Atom className="h-4 w-4 text-primary" />
@@ -250,7 +186,7 @@ export default function AgenteIAPage() {
             <Button
               size="icon"
               className="h-8 w-8 rounded-xl shrink-0 mb-0.5"
-              disabled={!input.trim() || loading}
+              disabled={!input.trim() || cargando}
               onClick={() => sendMessage()}
             >
               <Send className="h-4 w-4" />
@@ -262,48 +198,6 @@ export default function AgenteIAPage() {
         </div>
       </div>
     </div>
+    </ProtectedRoute>
   )
-}
-
-// ─────────────────────────────────────────────────────────────
-// BURBUJA DE MENSAJE
-// ─────────────────────────────────────────────────────────────
-function MessageBubble({ message }: { message: Message }) {
-  const isUser = message.role === "user"
-  const time = message.timestamp.toLocaleTimeString("es-CO", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-
-  return (
-    <div className={cn(
-      "flex items-start gap-3 max-w-3xl mx-auto w-full",
-      isUser && "flex-row-reverse"
-    )}>
-      <div className={cn(
-        "flex h-8 w-8 items-center justify-center rounded-lg shrink-0 mt-0.5 text-xs font-semibold",
-        isUser
-          ? "bg-primary text-primary-foreground"
-          : "bg-primary/10 border border-primary/20 text-primary"
-      )}>
-        {isUser ? "Tú" : <Atom className="h-4 w-4" />}
-      </div>
-
-      <div className={cn(
-        "rounded-2xl px-4 py-3 text-sm leading-relaxed max-w-[80%] whitespace-pre-wrap",
-        isUser
-          ? "bg-primary text-primary-foreground rounded-tr-sm"
-          : "bg-card border border-border text-foreground rounded-tl-sm"
-      )}>
-        {message.content}
-        <span className={cn(
-          "block text-[10px] mt-1.5",
-          isUser ? "text-primary-foreground/60 text-right" : "text-muted-foreground"
-        )}>
-          {time}
-        </span>
-      </div>
-    </div>
-  )
-
 }

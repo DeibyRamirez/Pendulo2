@@ -1,21 +1,20 @@
 "use client"
 
-import { useState } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
-import { iniciarSesion, iniciarSesionConGoogle, obtenerPerfilUsuario, perfilTieneInstitucion, obtenerRutaDashboardPorRol, procesarRetornoGoogle } from '../services/authService';
-import { useAuth } from '@/hooks/useAuth';
-import { getDashboardPathByRole } from '@/lib/roles';
+import { esperarAuthListo, iniciarSesion, iniciarSesionConGoogle, obtenerPerfilUsuario, perfilTieneInstitucion, obtenerRutaDashboardPorRol, procesarRetornoGoogle } from '../services/authService';
+import { marcarTiempo } from '@/lib/marcarTiempo';
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { IconoPendulo } from "@/components/IconoPendulo"
+import { NOMBRE_PROYECTO, NOMBRE_RED, SIGLA_PROYECTO } from "@/lib/marca"
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, rol } = useAuth();
 
   // Estado del formulario
   const [email, setEmail]           = useState('');
@@ -26,14 +25,14 @@ export default function LoginPage() {
   const [isLoading, setIsLoading]   = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError]           = useState('');
-  const [loginIntent, setLoginIntent] = useState(false);
 
   useEffect(() => {
-    if (loginIntent && user) {
-      router.push(`/${getDashboardPathByRole(rol)}`);
-      setLoginIntent(false);
-    }
-  }, [loginIntent, user, rol, router]);
+    const inicio = marcarTiempo('pagina');
+    router.prefetch('/dashboard');
+    router.prefetch('/docente');
+    router.prefetch('/admin');
+    void esperarAuthListo().then(() => marcarTiempo('auth-listo', inicio));
+  }, [router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,15 +110,19 @@ export default function LoginPage() {
      evento.preventDefault();
      setError('');
      setIsLoading(true);
+     const inicio = marcarTiempo('clic');
 
       try {
-        await iniciarSesion(email, password);
-        setLoginIntent(true);
+        const credencial = await iniciarSesion(email, password);
+        marcarTiempo('sign-in', inicio);
+        const perfil = await obtenerPerfilUsuario(credencial.user.uid);
+        marcarTiempo('perfil', inicio);
+        router.push(`/${obtenerRutaDashboardPorRol(perfil?.rol)}`);
+        marcarTiempo('navegacion', inicio);
       } catch (err) {
-       // Mostrar error traducido al usuario
+       marcarTiempo('sign-in-error', inicio);
        const authError = err as AuthError;
        setError(traducirError(authError.code));
-     } finally {
        setIsLoading(false);
     }
    }
@@ -155,15 +158,11 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-7 h-7 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="4" r="2" />
-                <line x1="12" y1="6" x2="12" y2="16" />
-                <circle cx="12" cy="18" r="3" fill="currentColor" />
-              </svg>
+              <IconoPendulo className="w-7 h-7 text-primary" />
             </div>
             <div className="text-left">
-              <h1 className="text-xl font-bold text-foreground">WPA</h1>
-              <p className="text-xs text-muted-foreground">World Pendulum Alliance</p>
+              <h1 className="text-xl font-bold text-foreground">{SIGLA_PROYECTO}</h1>
+              <p className="text-xs text-muted-foreground">{NOMBRE_PROYECTO}</p>
             </div>
           </Link>
         </div>
@@ -195,7 +194,7 @@ export default function LoginPage() {
                   required
                 />
                 <p className="text-xs text-muted-foreground">
-                  Solo correos @uniautonoma.edu.co o universidades de la red WPA
+                  Solo correos @uniautonoma.edu.co o universidades de la {NOMBRE_RED}
                 </p>
               </div>
 
@@ -297,7 +296,7 @@ export default function LoginPage() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          World Pendulum Alliance - Erasmus+ | UAC - UNIANDES
+          {NOMBRE_PROYECTO} | UAC - UNIANDES
         </p>
       </div>
     </div>

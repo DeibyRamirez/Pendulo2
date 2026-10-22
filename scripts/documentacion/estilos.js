@@ -1,5 +1,5 @@
 /**
- * Estilos y bloques reutilizables para los manuales universitarios WPA.
+ * Estilos y bloques reutilizables para los manuales universitarios PPI.
  * El generador es independiente de la aplicación web (no altera package.json raíz).
  */
 
@@ -285,7 +285,7 @@ function crearPortada({ tituloDocumento, tipoDocumento, descripcionCorta }) {
       run: { size: 22, color: COLORES.grisSecundario, italics: true },
     }),
     lineaSeparadora(),
-    parrafo("WORLD PENDULUM ALLIANCE (WPA)", {
+    parrafo("PROYECTO PÉNDULOS INTERCONECTADOS (PPI)", {
       alignment: AlignmentType.CENTER,
       after: 40,
       run: { bold: true, size: 36, color: COLORES.azul },
@@ -310,7 +310,7 @@ function crearPortada({ tituloDocumento, tipoDocumento, descripcionCorta }) {
       after: 280,
       run: { size: 22, italics: true },
     }),
-    parrafo("Proyecto institucional UAC – UNIANDES  |  Red Erasmus+", {
+    parrafo("Proyecto institucional UAC – UNIANDES", {
       alignment: AlignmentType.CENTER,
       after: 320,
       run: { size: 20, color: COLORES.azulMedio },
@@ -325,7 +325,7 @@ function crearPortada({ tituloDocumento, tipoDocumento, descripcionCorta }) {
         ["Semestre / Periodo", "[SEMESTRE / PERIODO]"],
         ["Versión del documento", "1.0"],
         ["Fecha", "Septiembre de 2026"],
-        ["Clasificación", "Documento académico de la plataforma WPA"],
+        ["Clasificación", "Documento académico de la plataforma PPI"],
       ],
       [3200, 6160]
     ),
@@ -362,7 +362,7 @@ function crearFichaControl(nombreDocumento) {
     ),
     espacioDespuesTabla(),
     parrafo(
-      "El contenido describe el comportamiento real de la plataforma World Pendulum Alliance tal como está implementado en el repositorio del proyecto. Las pantallas de prototipo no conectadas a datos reales se declaran explícitamente fuera de alcance operativo."
+      "El contenido describe el comportamiento real de la plataforma Proyecto Péndulos Interconectados tal como está implementado en el repositorio del proyecto. Las pantallas de prototipo no conectadas a datos reales se declaran explícitamente fuera de alcance operativo."
     ),
   ];
 }
@@ -477,7 +477,7 @@ function encabezado(tituloCorto) {
         },
         spacing: { after: 120 },
         children: [
-          run("WPA  ·  Corporación Universitaria Autónoma del Cauca", {
+          run("PPI  ·  Corporación Universitaria Autónoma del Cauca", {
             size: 16,
             color: COLORES.azul,
             bold: true,
@@ -518,7 +518,7 @@ function pieDePagina() {
 
 function construirDocumento({ titulo, tituloCorto, tipoDocumento, descripcionCorta, cuerpo }) {
   return new Document({
-    creator: "Plataforma WPA — Corporación Universitaria Autónoma del Cauca",
+    creator: "Plataforma PPI — Corporación Universitaria Autónoma del Cauca",
     title: titulo,
     description: tipoDocumento,
     styles: estilosDocumento(),

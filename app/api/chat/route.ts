@@ -1,5 +1,7 @@
 // app/api/chat/route.ts
 
+import { applicationDefault, cert, getApps, initializeApp, type ServiceAccount } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { MODEL_CONFIG, PHYSICS_SYSTEM_PROMPT } from "@/lib/physics-context";
 import { NextResponse } from "next/server";
 
@@ -10,6 +12,56 @@ interface IncomingMessage {
 
 interface RequestBody {
   messages: IncomingMessage[];
+}
+
+// ─── Autenticación (Firebase Admin) ───
+// La cuenta de servicio (GOOGLE_SERVICE_ACCOUNT_JSON) o ADC pertenece al mismo
+// proyecto que Firebase Auth, así que verifyIdToken valida los ID tokens web.
+function obtenerAuthAdmin() {
+  if (getApps().length === 0) {
+    const saJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    const credencial = saJson
+      ? cert(JSON.parse(saJson) as ServiceAccount)
+      : applicationDefault();
+    initializeApp({ credential: credencial });
+  }
+  return getAuth();
+}
+
+async function obtenerUidAutenticado(request: Request): Promise<string | null> {
+  const encabezado = request.headers.get("authorization") ?? "";
+  const token = encabezado.startsWith("Bearer ") ? encabezado.slice(7).trim() : "";
+  if (!token) return null;
+  try {
+    const decodificado = await obtenerAuthAdmin().verifyIdToken(token);
+    return decodificado.uid;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Límite en memoria por usuario ───
+// En serverless cada instancia tiene su propia memoria: esto NO es un límite
+// global, solo frena ráfagas dentro de la misma instancia.
+const LIMITE_MENSAJES = 20;
+const VENTANA_LIMITE_MS = 10 * 60 * 1000;
+const MAX_LONGITUD_MENSAJE = 2000;
+const MAX_MENSAJES_HISTORIAL = 20;
+
+const marcasPorUsuario = new Map<string, number[]>();
+
+function superaLimite(uid: string): boolean {
+  const ahora = Date.now();
+  const vigentes = (marcasPorUsuario.get(uid) ?? []).filter(
+    (marca) => ahora - marca < VENTANA_LIMITE_MS
+  );
+  if (vigentes.length >= LIMITE_MENSAJES) {
+    marcasPorUsuario.set(uid, vigentes);
+    return true;
+  }
+  vigentes.push(ahora);
+  marcasPorUsuario.set(uid, vigentes);
+  return false;
 }
 
 // ─── Obtener Access Token usando Application Default Credentials ───
@@ -127,6 +179,15 @@ async function getTokenFromServiceAccount(sa: {
 // ─── POST /api/chat ───
 export async function POST(request: Request) {
   try {
+    // 1. Autenticación: solo ID tokens válidos de Firebase.
+    const uid = await obtenerUidAutenticado(request);
+    if (!uid) {
+      return NextResponse.json(
+        { error: "No autenticado. Inicia sesión para usar el asistente." },
+        { status: 401 }
+      );
+    }
+
     // Validar body
     const body: RequestBody = await request.json();
     if (
@@ -140,6 +201,38 @@ export async function POST(request: Request) {
             "El campo 'messages' es obligatorio y debe ser un array no vacío.",
         },
         { status: 400 }
+      );
+    }
+
+    if (body.messages.length > MAX_MENSAJES_HISTORIAL) {
+      return NextResponse.json(
+        { error: `El historial no puede superar ${MAX_MENSAJES_HISTORIAL} mensajes.` },
+        { status: 400 }
+      );
+    }
+
+    const mensajeInvalido = body.messages.some(
+      (msg) =>
+        typeof msg?.content !== "string" ||
+        msg.content.trim().length === 0 ||
+        msg.content.length > MAX_LONGITUD_MENSAJE
+    );
+    if (mensajeInvalido) {
+      return NextResponse.json(
+        {
+          error: `Cada mensaje debe ser texto de máximo ${MAX_LONGITUD_MENSAJE} caracteres.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // 2. Límite simple por usuario (ver nota de memoria por instancia).
+    if (superaLimite(uid)) {
+      return NextResponse.json(
+        {
+          error: `Has alcanzado el límite de ${LIMITE_MENSAJES} mensajes cada 10 minutos. Intenta de nuevo más tarde.`,
+        },
+        { status: 429 }
       );
     }
 

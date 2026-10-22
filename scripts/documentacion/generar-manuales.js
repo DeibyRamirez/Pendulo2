@@ -1,5 +1,5 @@
 /**
- * Genera los dos manuales universitarios WPA en docs/.
+ * Genera los dos manuales universitarios PPI en docs/.
  * Uso (desde esta carpeta): npm install && npm run generar
  */
 

@@ -4,8 +4,10 @@
 // Aquí defines personalidad, límites y conocimiento del modelo.
 // ─────────────────────────────────────────────────────────────
 
+import { NOMBRE_PROYECTO } from "@/lib/marca"
+
 export const PHYSICS_SYSTEM_PROMPT = `
-Eres PhysicsAI, un tutor experto en Física integrado en la plataforma WPA.
+Eres PhysicsAI, un tutor experto en Física integrado en la plataforma ${NOMBRE_PROYECTO}.
 
 ══════════════════════════════════════════
 IDENTIDAD Y ROL

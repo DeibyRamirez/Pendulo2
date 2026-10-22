@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react"
+import { IconoPendulo } from "@/components/IconoPendulo"
+import { NOMBRE_PROYECTO, NOMBRE_RED, SIGLA_PROYECTO } from "@/lib/marca"
 import { completarRegistroGoogle, obtenerPerfilUsuario, obtenerRutaDashboardPorRol, perfilTieneInstitucion, registrarUsuario, validarDominioInstitucional } from "@/app/services/authService"
 
 const INSTITUCIONES = [
@@ -17,7 +19,7 @@ const INSTITUCIONES = [
   { value: "Universidad Nacional de Colombia", label: "Universidad Nacional de Colombia" },
   { value: "Universitat Politècnica de Catalunya", label: "Universitat Politècnica de Catalunya" },
   { value: "Massachusetts Institute of Technology", label: "Massachusetts Institute of Technology" },
-  { value: "otra", label: "Otra institución de la red WPA" }
+  { value: "otra", label: `Otra institución de la ${NOMBRE_RED}` }
 ]
 
 export default function RegistroPage() {
@@ -215,15 +217,11 @@ export default function RegistroPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-7 h-7 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="4" r="2" />
-                <line x1="12" y1="6" x2="12" y2="16" />
-                <circle cx="12" cy="18" r="3" fill="currentColor" />
-              </svg>
+              <IconoPendulo className="w-7 h-7 text-primary" />
             </div>
             <div className="text-left">
-              <h1 className="text-xl font-bold text-foreground">WPA</h1>
-              <p className="text-xs text-muted-foreground">World Pendulum Alliance</p>
+              <h1 className="text-xl font-bold text-foreground">{SIGLA_PROYECTO}</h1>
+              <p className="text-xs text-muted-foreground">{NOMBRE_PROYECTO}</p>
             </div>
           </Link>
         </div>

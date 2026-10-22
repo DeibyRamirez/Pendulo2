@@ -30,6 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
       if (authUser) {
+        // La ruta protegida no debe devolver al login mientras el perfil aún viaja.
+        setLoading(true);
         try {
           const userDoc = await getDoc(doc(db, "usuarios", authUser.uid));
           if (userDoc.exists()) {

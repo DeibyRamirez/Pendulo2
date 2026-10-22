@@ -62,6 +62,10 @@ npm install --omit=dev
 tar -czvf bridge.tar.gz --exclude=.git *
 ```
 
+> **Nota:** `bridge.tar.gz` es un artefacto de despliegue que se genera
+> localmente con el comando de arriba y **no se versiona en git** (está
+> ignorado en `.gitignore`). No lo agregues con `git add`.
+
 **Sube el archivo (créale antes la carpeta destino en la Pi, o sube a `/home/pi/`):**
 
 ```powershell

@@ -28,6 +28,8 @@ import { usePendulos } from "@/hooks/usePendulos"
 import { useAuth } from "@/hooks/useAuth"
 import { getDashboardPathByRole } from "@/lib/roles"
 import { CameraStream } from "@/components/camera-stream"
+import { IconoPendulo } from "@/components/IconoPendulo"
+import { NOMBRE_PROYECTO, NOMBRE_RED } from "@/lib/marca"
 import { usePenduloData, type LecturaPendulo } from "@/hooks/usePenduloData"
 import { escucharLecturasPractica } from "@/app/services/penduloDataService"
 import {
@@ -198,7 +200,7 @@ export default function PenduloPublicoPage({
         : "Sin registro"
 
   const badgeEstadoClass = hayDatosEnVivo
-    ? "bg-green-500/20 text-green-400 border-green-500/30"
+    ? "bg-[rgb(62_224_143/0.16)] text-[var(--color-ok)] border-[rgb(62_224_143/0.35)]"
     : hayUltimoMuestreo
       ? "bg-primary/15 text-primary border-primary/30"
       : penduloSeleccionado?.estado === "Activo"
@@ -220,15 +222,11 @@ export default function PenduloPublicoPage({
         <div className="container mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="4" r="2" />
-                <line x1="12" y1="6" x2="12" y2="16" />
-                <circle cx="12" cy="18" r="3" fill="currentColor" />
-              </svg>
+              <IconoPendulo className="w-6 h-6 text-primary" />
             </div>
             <div>
               <h1 className="font-semibold">Péndulo {penduloId}</h1>
-              <p className="text-xs text-muted-foreground">World Pendulum Alliance</p>
+              <p className="text-xs text-muted-foreground">{NOMBRE_PROYECTO}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -419,7 +417,7 @@ export default function PenduloPublicoPage({
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <div
-                      className={`w-2 h-2 rounded-full ${hayDatosEnVivo ? "bg-green-500 animate-pulse" : hayUltimoMuestreo ? "bg-primary" : "bg-muted-foreground"}`}
+                      className={`w-2 h-2 rounded-full ${hayDatosEnVivo ? "bg-[var(--color-ok)] latido" : hayUltimoMuestreo ? "bg-primary" : "bg-muted-foreground"}`}
                     />
                     {hayDatosEnVivo
                       ? "Práctica en vivo"
@@ -430,7 +428,7 @@ export default function PenduloPublicoPage({
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="h-64">
+                <div className="h-56 grafica">
                   {chartData.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-sm text-muted-foreground text-center px-4">
                       No hay un muestreo en Firestore todavía. Cuando el péndulo mida, aquí verás
@@ -439,7 +437,7 @@ export default function PenduloPublicoPage({
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={chartData} margin={{ top: 5, right: 16, left: 8, bottom: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <CartesianGrid stroke="rgba(247,245,241,.06)" />
                         <XAxis
                           type="number"
                           dataKey="muestra"
@@ -447,24 +445,30 @@ export default function PenduloPublicoPage({
                           ticks={ticksMuestra}
                           interval={0}
                           allowDecimals={false}
-                          tick={{ fill: "var(--muted-foreground)", fontSize: maxMuestras > 12 ? 10 : 12 }}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: "#9a9ba0", fontSize: 11, fontFamily: "var(--font-mono)" }}
                           label={{
                             value: "Muestra",
                             position: "insideBottom",
                             offset: -4,
-                            fill: "var(--muted-foreground)",
+                            fill: "#9a9ba0",
+                            fontSize: 11,
                           }}
                         />
                         <YAxis
-                          tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: "#9a9ba0", fontSize: 11, fontFamily: "var(--font-mono)" }}
                           domain={["auto", "auto"]}
                         />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: "var(--card)",
                             border: "1px solid var(--border)",
-                            borderRadius: "8px",
+                            borderRadius: "6px",
                             color: "var(--foreground)",
+                            fontFamily: "var(--font-mono)",
                           }}
                         />
                         <Line
@@ -473,7 +477,8 @@ export default function PenduloPublicoPage({
                           name="Período (s)"
                           stroke="var(--chart-1)"
                           strokeWidth={2}
-                          dot={{ r: 3 }}
+                          dot={false}
+                          isAnimationActive={false}
                           connectNulls
                         />
                       </LineChart>
@@ -489,10 +494,10 @@ export default function PenduloPublicoPage({
 
         <div className="mt-12 text-center">
           <p className="text-sm text-muted-foreground mb-2">
-            Este péndulo forma parte de la red World Pendulum Alliance (WPA)
+            Este péndulo forma parte de la {NOMBRE_RED}
           </p>
           <p className="text-xs text-muted-foreground">
-            Proyecto financiado por Erasmus+ | Convenio UAC - Universidad de los Andes
+            Convenio UAC - Universidad de los Andes
           </p>
         </div>
       </main>

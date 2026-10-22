@@ -186,12 +186,8 @@ export async function listarPracticasUsuario(penduloId, uid) {
  */
 export async function listarPracticasDeUsuario(uid, penduloIds) {
   const ids = [...new Set((penduloIds || []).filter(Boolean))];
-  const todas = [];
-
-  for (const penduloId of ids) {
-    const practicas = await listarPracticasUsuario(penduloId, uid);
-    todas.push(...practicas);
-  }
+  const grupos = await Promise.all(ids.map((penduloId) => listarPracticasUsuario(penduloId, uid)));
+  const todas = grupos.flat();
 
   return todas.sort((a, b) => {
     const ta = a.inicio?.toMillis?.() ?? 0;

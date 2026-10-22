@@ -23,7 +23,10 @@ import {
   ChevronDown,
   Filter,
   Loader2,
+  ArrowLeft,
 } from 'lucide-react';
+import Link from 'next/link';
+import { obtenerRutaInicioPorRol } from '@/lib/rutas';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,7 +61,7 @@ function duracionPractica(inicio: Timestamp | null | undefined, fin: Timestamp |
 }
 
 export default function HistorialPage({ embedded = false }: { embedded?: boolean }) {
-  const { user } = useAuth();
+  const { user, rol } = useAuth();
   const result = useReservations(user?.uid || '');
   const reservaciones = result?.reservaciones || [];
   const loadingReservas = result?.loading || false;
@@ -138,6 +141,17 @@ export default function HistorialPage({ embedded = false }: { embedded?: boolean
       <main className={embedded ? "bg-background" : "min-h-screen bg-background"}>
         <div className={embedded ? "p-4 md:p-6" : "pt-24 pb-16"}>
           <div className="mx-auto max-w-7xl px-0 sm:px-2 lg:px-8">
+
+            {!embedded && (
+              <div className="mb-6">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={obtenerRutaInicioPorRol(rol)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Volver al panel
+                  </Link>
+                </Button>
+              </div>
+            )}
 
             <div className="mb-8">
               <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Historial de prácticas</h1>

@@ -6,11 +6,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FlaskConical, FileDown, Loader2, Play, Square } from "lucide-react";
+import { FlaskConical, FileDown, Loader2, Play, RotateCcw, Square } from "lucide-react";
 import { escucharPenduloEnVivo } from "@/app/services/penduloDataService";
 import {
   hayControlAjenoVigente,
   iniciarPruebaManual,
+  reiniciarLoopManual,
   finalizarPruebaManual,
 } from "@/app/services/reservacionService";
 import { exportarLecturasUsuario } from "@/app/services/lecturasExportService";
@@ -86,6 +87,9 @@ export function PruebaManualCard({ penduloId = PENDULO_PREDETERMINADO }: PruebaM
 
   const loop = enVivo?.loopManual;
   const loopActivo = capturaActiva && loop?.activo === true;
+  const loopRequiereReinicio =
+    capturaActiva &&
+    (!loop?.activo || loop?.estado === "error" || loop?.estado === "detenido");
 
   const ocupadoPorOtro = hayControlAjenoVigente(enVivo, user?.uid);
 
@@ -115,6 +119,23 @@ export function PruebaManualCard({ penduloId = PENDULO_PREDETERMINADO }: PruebaM
       setPracticaIdSesion(practicaId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo iniciar la prueba manual");
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  async function alReiniciarLoop() {
+    if (!user?.uid) return;
+    setError("");
+    setProcesando(true);
+    try {
+      const { practicaId } = await reiniciarLoopManual({
+        penduloId,
+        usuarioId: user.uid,
+      });
+      setPracticaIdSesion(practicaId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo reiniciar el loop automático");
     } finally {
       setProcesando(false);
     }
@@ -189,15 +210,20 @@ export function PruebaManualCard({ penduloId = PENDULO_PREDETERMINADO }: PruebaM
         {capturaActiva ? (
           <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm space-y-2">
             <p className="font-medium text-foreground">Sesión: {enVivo?.practicaId ?? practicaIdSesion}</p>
-            {loopActivo && estadoLoopLabel ? (
+            {estadoLoopLabel ? (
               <p className="text-foreground">
                 Estado del loop: <strong>{estadoLoopLabel}</strong>
               </p>
+            ) : loopRequiereReinicio ? (
+              <p className="text-amber-600 dark:text-amber-400">
+                El loop automático no está en marcha. Pulse <strong>Reiniciar loop automático</strong> para
+                enviar de nuevo cfg 15/15.
+              </p>
             ) : null}
-            {loopActivo && typeof loop?.cicloActual === "number" && loop.cicloActual > 0 ? (
+            {typeof loop?.cicloActual === "number" && loop.cicloActual > 0 ? (
               <p className="text-muted-foreground">Ciclo actual: {loop.cicloActual}</p>
             ) : null}
-            {loopActivo && loop?.proximoCicloEn ? (
+            {loop?.proximoCicloEn && loopActivo ? (
               <p className="text-muted-foreground">
                 Próximo ciclo: {formatTimestamp(loop.proximoCicloEn)}
               </p>
@@ -234,14 +260,26 @@ export function PruebaManualCard({ penduloId = PENDULO_PREDETERMINADO }: PruebaM
               Iniciar prueba manual
             </Button>
           ) : (
-            <Button variant="destructive" onClick={() => void alFinalizar()} disabled={procesando}>
-              {procesando ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Square className="w-4 h-4 mr-2" />
-              )}
-              Finalizar prueba manual
-            </Button>
+            <>
+              {loopRequiereReinicio ? (
+                <Button onClick={() => void alReiniciarLoop()} disabled={procesando}>
+                  {procesando ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                  )}
+                  Reiniciar loop automático
+                </Button>
+              ) : null}
+              <Button variant="destructive" onClick={() => void alFinalizar()} disabled={procesando}>
+                {procesando ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Square className="w-4 h-4 mr-2" />
+                )}
+                Finalizar prueba manual
+              </Button>
+            </>
           )}
 
           {practicaIdExport ? (

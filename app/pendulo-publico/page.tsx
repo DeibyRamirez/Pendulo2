@@ -7,6 +7,10 @@ import { LogIn, QrCode } from "lucide-react";
 import Link from "next/link";
 import { PendulumChart } from "@/components/pendulum-chart";
 import { CameraStream } from "@/components/camera-stream";
+import { IconoPendulo } from "@/components/IconoPendulo";
+import { NOMBRE_PROYECTO, SIGLA_PROYECTO } from "@/lib/marca";
+import { IndicadoresUltimaPrueba } from "@/components/IndicadoresUltimaPrueba";
+import { PENDULO_PRINCIPAL_ID } from "@/lib/constantes";
 
 export default function PublicPendulumPage() {
   const [qrCode, setQrCode] = useState<string>("");
@@ -24,15 +28,11 @@ export default function PublicPendulumPage() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="inline-flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="4" r="2" />
-                <line x1="12" y1="6" x2="12" y2="16" />
-                <circle cx="12" cy="18" r="3" fill="currentColor" />
-              </svg>
+              <IconoPendulo className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-foreground">WPA</h1>
-              <p className="text-xs text-muted-foreground">World Pendulum Alliance</p>
+              <h1 className="text-lg font-bold text-foreground">{SIGLA_PROYECTO}</h1>
+              <p className="text-xs text-muted-foreground">{NOMBRE_PROYECTO}</p>
             </div>
           </Link>
           
@@ -69,32 +69,21 @@ export default function PublicPendulumPage() {
                     <CardDescription>Datos en tiempo real del sistema</CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-sm text-muted-foreground">En vivo</span>
+                    <span className="h-2 w-2 rounded-full bg-[var(--color-niebla)]" />
+                    <span className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">Demostración</span>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <PendulumChart />
-                <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-foreground">15.7°</p>
-                    <p className="text-sm text-muted-foreground">Ángulo</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-foreground">0.42 m/s</p>
-                    <p className="text-sm text-muted-foreground">Velocidad</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-foreground">2.01 s</p>
-                    <p className="text-sm text-muted-foreground">Período</p>
-                  </div>
+                <div className="mt-6 pt-6 border-t border-border">
+                  <IndicadoresUltimaPrueba />
                 </div>
               </CardContent>
             </Card>
 
             <div className="mt-6">
-              <CameraStream penduloId="UAC-01" />
+              <CameraStream penduloId={PENDULO_PRINCIPAL_ID} />
             </div>
 
             {/* Información del Péndulo */}
@@ -107,8 +96,8 @@ export default function PublicPendulumPage() {
                   <div className="flex justify-between items-center py-2 border-b border-border">
                     <span className="text-muted-foreground">Estado</span>
                     <span className="font-medium flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-green-500" />
-                      Activo
+                      <span className="h-2 w-2 rounded-full bg-[var(--color-niebla)]" />
+                      Según la última medición
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-border">
@@ -120,8 +109,8 @@ export default function PublicPendulumPage() {
                     <span className="font-medium">Popayán, Colombia</span>
                   </div>
                   <div className="flex justify-between items-center py-2">
-                    <span className="text-muted-foreground">Última Actualización</span>
-                    <span className="font-medium">Ahora</span>
+                    <span className="text-muted-foreground">Gráfica</span>
+                    <span className="font-medium">Modelo de demostración</span>
                   </div>
                 </div>
               </CardContent>
