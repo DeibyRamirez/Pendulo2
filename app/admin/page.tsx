@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   BarChart3,
   CalendarClock,
-  Globe,
-  LogOut,
   MapPin,
-  Menu,
   Plus,
   RefreshCw,
   Save,
@@ -23,15 +18,7 @@ import {
   Users,
   Wrench,
   ClipboardList,
-  X,
 } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import {
   actualizarEstadoPendulo,
   actualizarPendulo,
@@ -90,7 +77,6 @@ function toDate(value: Reservacion["inicio_sesion_reserva"]): Date {
 }
 
 export default function DashboardAdminPage() {
-  const { user, logout } = useAuth();
   const { activo: moduloEvaluacion, cargando: cargandoModulo } = useModuloEvaluacion();
   const [guardandoModulo, setGuardandoModulo] = useState(false);
 
@@ -101,7 +87,6 @@ export default function DashboardAdminPage() {
   const [editingPenduloId, setEditingPenduloId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"pendulos" | "usuarios" | "reservas">("pendulos");
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const [nuevoPendulo, setNuevoPendulo] = useState({
     pendulo_id: "",
@@ -249,76 +234,12 @@ export default function DashboardAdminPage() {
   return (
     <ProtectedRoute requiredRole="Admin" exactRole>
       <div className="min-h-screen bg-background">
-        <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-lg font-bold text-foreground truncate">Panel Admin {SIGLA_PROYECTO}</h1>
-              <p className="text-xs text-muted-foreground">Gestión completa de la plataforma</p>
-            </div>
-            <div className="hidden lg:flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-foreground">{user?.nombre || user?.email}</p>
-                <p className="text-xs text-muted-foreground">Administrador</p>
-              </div>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/mapa">
-                  <Globe className="w-4 h-4 mr-2" /> Ver mapa de la red
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/reservas">
-                  <CalendarClock className="w-4 h-4 mr-2" /> Reservas
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/historial">
-                  <BarChart3 className="w-4 h-4 mr-2" /> Historial
-                </Link>
-              </Button>
-              <Button variant="destructive" size="sm" onClick={logout}>
-                <LogOut className="w-4 h-4 mr-2" /> Cerrar sesión
-              </Button>
-            </div>
-            <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden touch-target" aria-label="Abrir menú">
-                  {mobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[min(100vw-2rem,20rem)]">
-                <SheetHeader>
-                  <SheetTitle>Menú administrador</SheetTitle>
-                </SheetHeader>
-                <div className="mt-6 space-y-4">
-                  <div className="rounded-lg border border-border p-3">
-                    <p className="text-sm font-medium text-foreground">{user?.nombre || user?.email}</p>
-                    <p className="text-xs text-muted-foreground">Administrador</p>
-                  </div>
-                  <Button asChild variant="outline" className="w-full touch-target" onClick={() => setMobileNavOpen(false)}>
-                    <Link href="/mapa">
-                      <Globe className="w-4 h-4 mr-2" /> Ver mapa de la red
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="w-full touch-target" onClick={() => setMobileNavOpen(false)}>
-                    <Link href="/reservas">
-                      <CalendarClock className="w-4 h-4 mr-2" /> Reservas
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="w-full touch-target" onClick={() => setMobileNavOpen(false)}>
-                    <Link href="/historial">
-                      <BarChart3 className="w-4 h-4 mr-2" /> Historial
-                    </Link>
-                  </Button>
-                  <Button variant="destructive" className="w-full touch-target" onClick={() => { setMobileNavOpen(false); logout(); }}>
-                    <LogOut className="w-4 h-4 mr-2" /> Cerrar sesión
-                  </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-        </nav>
-
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
+          <div>
+            <h1 className="text-lg font-bold text-foreground">Panel Admin {SIGLA_PROYECTO}</h1>
+            <p className="text-xs text-muted-foreground">Gestión completa de la plataforma</p>
+          </div>
+
           {error && (
             <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               {error}

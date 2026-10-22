@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { BarraDocente } from "@/components/BarraDocente";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, BarChart3, Users, FileDown, Globe, MapPin, Loader2, UsersRound } from "lucide-react";
@@ -71,8 +70,6 @@ export default function DashboardDocentePage() {
   return (
     <ProtectedRoute requiredRole="Docente" exactRole>
       <div className="min-h-screen bg-background">
-        <BarraDocente />
-
         <main className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-foreground mb-2">
@@ -119,8 +116,8 @@ export default function DashboardDocentePage() {
                   Observa el movimiento del péndulo, ángulo, velocidad y oscilaciones en tiempo real con gráficas
                   interactivas.
                 </p>
-                <Link href="/mapa">
-                  <Button className="w-full">Ver Mapa</Button>
+                <Link href="/dashboard/realtime">
+                  <Button className="w-full">Ver en tiempo real</Button>
                 </Link>
               </CardContent>
             </Card>
@@ -138,7 +135,7 @@ export default function DashboardDocentePage() {
                   Crea, modifica y cancela reservas para tus estudiantes. Visualiza el calendario completo de
                   disponibilidad.
                 </p>
-                <Link href="/reservas">
+                <Link href="/dashboard/reservas">
                   <Button className="w-full">Gestionar</Button>
                 </Link>
               </CardContent>
@@ -161,7 +158,7 @@ export default function DashboardDocentePage() {
                   Descargar Excel de muestras
                 </Button> */}
                 {errorExcelMuestras ? <p className="text-sm text-destructive mt-3">{errorExcelMuestras}</p> : null}
-                <Link href="/historial" className="mt-3 block">
+                <Link href="/dashboard/historial" className="mt-3 block">
                   <Button className="w-full" variant="outline">
                     <FileDown className="w-4 h-4 mr-2" />
                     Ir al historial
@@ -191,7 +188,7 @@ export default function DashboardDocentePage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Consulta el historial completo de experimentos con gráficas, datos y análisis de sesiones.
                 </p>
-                <Link href="/historial">
+                <Link href="/dashboard/historial">
                   <Button className="w-full" variant="outline">
                     Ver Historial
                   </Button>

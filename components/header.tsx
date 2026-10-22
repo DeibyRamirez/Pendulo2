@@ -8,15 +8,18 @@ import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { IconoPendulo } from "@/components/IconoPendulo"
 import { NOMBRE_PROYECTO, NOMBRE_RED, SIGLA_PROYECTO } from "@/lib/marca"
+import { obtenerRutaInicioPorRol } from "@/lib/rutas"
 import { cn } from "@/lib/utils"
 
-const navigation = [
-  { name: "Inicio", href: "/" },
-  { name: "Dashboard", href: "/dashboard" },
-  { name: "Reservas", href: "/reservas" },
-  { name: NOMBRE_RED, href: "/mapa" },
-  { name: "Acerca de", href: "/#about" },
-]
+function navigationFor(panelHref: string) {
+  return [
+    { name: "Inicio", href: "/" },
+    { name: "Dashboard", href: panelHref },
+    { name: "Reservas", href: "/reservas" },
+    { name: NOMBRE_RED, href: "/mapa" },
+    { name: "Acerca de", href: "/#about" },
+  ]
+}
 
 function isCurrent(href: string, pathname: string) {
   if (href === "/") return pathname === "/"
@@ -27,8 +30,9 @@ function isCurrent(href: string, pathname: string) {
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const { user, logout } = useAuth()
+  const { user, rol, logout } = useAuth()
   const pathname = usePathname()
+  const navigation = navigationFor(user ? obtenerRutaInicioPorRol(rol) : "/dashboard")
 
   const handleLogout = async () => {
     await logout()

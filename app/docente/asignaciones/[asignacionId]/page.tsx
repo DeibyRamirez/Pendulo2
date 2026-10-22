@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { GuardiaModuloEvaluacion } from "@/components/guardia-modulo-evaluacion";
-import { BarraDocente } from "@/components/BarraDocente";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -246,7 +245,6 @@ export default function PaginaCalificacionAsignacion() {
     <ProtectedRoute requiredRole="Docente" exactRole>
       <GuardiaModuloEvaluacion destino="/docente">
       <div className="min-h-screen bg-background">
-        <BarraDocente />
         <main className="max-w-7xl mx-auto px-6 py-8">
           <Link
             href={asignacion ? `/docente/grupos/${asignacion.grupo_id}` : "/docente/grupos"}
