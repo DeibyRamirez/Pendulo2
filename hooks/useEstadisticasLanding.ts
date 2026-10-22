@@ -14,36 +14,63 @@ function contarUniversidades(pendulos: { institucion?: string }[]): number {
 }
 
 export function useEstadisticasLanding() {
-  const { pendulos, loading: cargandoPendulos } = usePendulos();
+  const { pendulos, loading: cargandoPendulos, error: errorPendulos } = usePendulos();
   const [publicas, setPublicas] = useState({
     estudiantesRegistrados: 0,
     experimentosRealizados: 0,
   });
   const [cargandoPublicas, setCargandoPublicas] = useState(true);
+  const [errorPublicas, setErrorPublicas] = useState<string | null>(null);
 
   useEffect(() => {
     setCargandoPublicas(true);
+    setErrorPublicas(null);
     const unsub = escucharEstadisticasPublicas(
       (data) => {
         setPublicas(data);
         setCargandoPublicas(false);
+        setErrorPublicas(null);
       },
-      () => setCargandoPublicas(false),
+      (err) => {
+        setCargandoPublicas(false);
+        const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+        setErrorPublicas(
+          code === 'permission-denied'
+            ? 'Sin permiso para leer estadísticas públicas. Revisa firestore.rules y el projectId.'
+            : 'No se pudieron cargar experimentos ni estudiantes registrados.',
+        );
+      },
     );
     return () => unsub();
   }, []);
 
   const universidadesConectadas = useMemo(() => contarUniversidades(pendulos), [pendulos]);
 
+  const errorLanding =
+    errorPublicas ||
+    (errorPendulos
+      ? 'No se pudieron cargar los péndulos (universidades conectadas).'
+      : null);
+
   return {
     experimentosRealizados: publicas.experimentosRealizados,
     estudiantesRegistrados: publicas.estudiantesRegistrados,
     universidadesConectadas,
-    loading: cargandoPendulos || cargandoPublicas,
+    loadingExperimentos: cargandoPublicas,
+    loadingEstudiantes: cargandoPublicas,
+    loadingUniversidades: cargandoPendulos,
+    errorLanding,
+    errorPublicas,
+    errorPendulos,
   };
 }
 
-export function formatearContadorLanding(valor: number, loading: boolean): string {
+export function formatearContadorLanding(
+  valor: number,
+  loading: boolean,
+  opts?: { error?: boolean },
+): string {
+  if (opts?.error) return '—';
   if (loading) return '—';
   return valor.toLocaleString('es-CO');
 }
