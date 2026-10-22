@@ -2,10 +2,16 @@
 
 Si ves **stats antiguas** (`500+`, «Estudiantes activos») pero el **hero nuevo** (Temperatura, Período, etc.), tu entorno no tiene el commit completo o Next sirve caché.
 
-Script rápido en Windows:
+Scripts de verificación:
 
 ```powershell
 .\scripts\verify-landing-stats-local.ps1
+```
+
+Compara `NEXT_PUBLIC_FIREBASE_PROJECT_ID` (`.env.local`) con `.firebaserc` → `projects.default`.
+
+```bash
+pnpm verify:landing-stats
 ```
 
 ## 1. Rama y commit

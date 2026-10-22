@@ -32,18 +32,43 @@ if ($rule) {
   Write-Host "FALTA regla publica en firestore.rules (actualiza desde origin/main)" -ForegroundColor Red
 }
 
-Write-Host "`n=== .env.local (projectId) ===" -ForegroundColor Cyan
+Write-Host "`n=== Proyecto Firebase (.env.local vs .firebaserc) ===" -ForegroundColor Cyan
+$firebaseRc = Join-Path $root ".firebaserc"
+$defaultFirebaseProject = $null
+if (Test-Path $firebaseRc) {
+  try {
+    $rc = Get-Content $firebaseRc -Raw | ConvertFrom-Json
+    $defaultFirebaseProject = $rc.projects.default
+    Write-Host ".firebaserc default: $defaultFirebaseProject"
+  } catch {
+    Write-Host "No se pudo leer .firebaserc" -ForegroundColor Yellow
+  }
+}
+
 $envPath = Join-Path $root ".env.local"
+$envProjectId = $null
 if (-not (Test-Path $envPath)) {
   Write-Host "No existe .env.local — copia .env.example y completa NEXT_PUBLIC_FIREBASE_*" -ForegroundColor Red
 } else {
-  $pidLine = Select-String -Path $envPath -Pattern "NEXT_PUBLIC_FIREBASE_PROJECT_ID"
+  $pidLine = Select-String -Path $envPath -Pattern "^\s*NEXT_PUBLIC_FIREBASE_PROJECT_ID\s*=\s*(.+)\s*$"
   if ($pidLine) {
-    Write-Host $pidLine.Line
-    Write-Host "Publica firestore.rules en ESE proyecto (Firebase Console o: firebase use <id>; firebase deploy --only firestore:rules)" -ForegroundColor Yellow
+    $envProjectId = $pidLine.Matches[0].Groups[1].Value.Trim().Trim('"').Trim("'")
+    Write-Host ".env.local NEXT_PUBLIC_FIREBASE_PROJECT_ID=$envProjectId"
   } else {
     Write-Host "Falta NEXT_PUBLIC_FIREBASE_PROJECT_ID en .env.local" -ForegroundColor Red
   }
+}
+
+if ($envProjectId -and $defaultFirebaseProject) {
+  if ($envProjectId -eq $defaultFirebaseProject) {
+    Write-Host "OK Mismo projectId en .env.local y .firebaserc" -ForegroundColor Green
+    Write-Host "Deploy reglas: firebase deploy --only firestore:rules" -ForegroundColor Yellow
+  } else {
+    Write-Host "DESALINEADO: la app usa $envProjectId pero firebase CLI usa $defaultFirebaseProject" -ForegroundColor Red
+    Write-Host "Alinea con: firebase use $envProjectId  (o corrige .env.local)" -ForegroundColor Yellow
+  }
+} elseif ($envProjectId) {
+  Write-Host "Deploy reglas: firebase use $envProjectId; firebase deploy --only firestore:rules" -ForegroundColor Yellow
 }
 
 Write-Host "`n=== Simulador Firebase (manual) ===" -ForegroundColor Cyan
