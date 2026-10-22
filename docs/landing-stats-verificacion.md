@@ -102,6 +102,7 @@ Consola (F12): busca `Error al escuchar estadísticas públicas` con `path` y `p
 | Universidades | Número real desde `pendulos` (p. ej. 1) |
 | Experimentos / estudiantes | `0` hasta backfill o nuevos eventos |
 | Disponibilidad | `99.9%` fijo |
+| `/pendulo-publico` | Misma telemetría que `/pendulo/UAC-01` (`VistaPublicaPendulo`), sin gráfica simulada |
 
 ## 6. Causas menos frecuentes
 
