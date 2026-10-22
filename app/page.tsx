@@ -8,7 +8,7 @@ import { BurbujaChatFlotante } from "@/components/chat/BurbujaChatFlotante"
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-background">
+    <main id="contenido" className="min-h-screen bg-background">
       <Header />
       <HeroSection />
       <StatsSection />

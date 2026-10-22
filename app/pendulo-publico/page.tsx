@@ -69,8 +69,8 @@ export default function PublicPendulumPage() {
                     <CardDescription>Datos en tiempo real del sistema</CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-sm text-muted-foreground">En vivo</span>
+                    <span className="h-2 w-2 rounded-full bg-[var(--color-niebla)]" />
+                    <span className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">Demostración</span>
                   </div>
                 </div>
               </CardHeader>
@@ -96,8 +96,8 @@ export default function PublicPendulumPage() {
                   <div className="flex justify-between items-center py-2 border-b border-border">
                     <span className="text-muted-foreground">Estado</span>
                     <span className="font-medium flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-green-500" />
-                      Activo
+                      <span className="h-2 w-2 rounded-full bg-[var(--color-niebla)]" />
+                      Según la última medición
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-border">
@@ -109,8 +109,8 @@ export default function PublicPendulumPage() {
                     <span className="font-medium">Popayán, Colombia</span>
                   </div>
                   <div className="flex justify-between items-center py-2">
-                    <span className="text-muted-foreground">Última Actualización</span>
-                    <span className="font-medium">Ahora</span>
+                    <span className="text-muted-foreground">Gráfica</span>
+                    <span className="font-medium">Modelo de demostración</span>
                   </div>
                 </div>
               </CardContent>

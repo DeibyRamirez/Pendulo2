@@ -224,7 +224,7 @@ export default function PenduloPublicoPage({
         : "Sin registro"
 
   const badgeEstadoClass = hayDatosEnVivo
-    ? "bg-green-500/20 text-green-400 border-green-500/30"
+    ? "bg-[rgb(62_224_143/0.16)] text-[var(--color-ok)] border-[rgb(62_224_143/0.35)]"
     : hayUltimoMuestreo
       ? "bg-primary/15 text-primary border-primary/30"
       : penduloSeleccionado?.estado === "Activo"
@@ -441,7 +441,7 @@ export default function PenduloPublicoPage({
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <div
-                      className={`w-2 h-2 rounded-full ${hayDatosEnVivo ? "bg-green-500 animate-pulse" : hayUltimoMuestreo ? "bg-primary" : "bg-muted-foreground"}`}
+                      className={`w-2 h-2 rounded-full ${hayDatosEnVivo ? "bg-[var(--color-ok)] latido" : hayUltimoMuestreo ? "bg-primary" : "bg-muted-foreground"}`}
                     />
                     {hayDatosEnVivo
                       ? "Práctica en vivo"
@@ -452,7 +452,7 @@ export default function PenduloPublicoPage({
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="h-64">
+                <div className="h-56 grafica">
                   {chartData.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-sm text-muted-foreground text-center px-4">
                       No hay un muestreo en Firestore todavía. Cuando el péndulo mida, aquí verás
@@ -461,7 +461,7 @@ export default function PenduloPublicoPage({
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={chartData} margin={{ top: 5, right: 16, left: 8, bottom: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <CartesianGrid stroke="rgba(247,245,241,.06)" />
                         <XAxis
                           type="number"
                           dataKey="muestra"
@@ -469,24 +469,30 @@ export default function PenduloPublicoPage({
                           ticks={ticksMuestra}
                           interval={0}
                           allowDecimals={false}
-                          tick={{ fill: "var(--muted-foreground)", fontSize: maxMuestras > 12 ? 10 : 12 }}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: "#9a9ba0", fontSize: 11, fontFamily: "var(--font-mono)" }}
                           label={{
                             value: "Muestra",
                             position: "insideBottom",
                             offset: -4,
-                            fill: "var(--muted-foreground)",
+                            fill: "#9a9ba0",
+                            fontSize: 11,
                           }}
                         />
                         <YAxis
-                          tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: "#9a9ba0", fontSize: 11, fontFamily: "var(--font-mono)" }}
                           domain={["auto", "auto"]}
                         />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: "var(--card)",
                             border: "1px solid var(--border)",
-                            borderRadius: "8px",
+                            borderRadius: "6px",
                             color: "var(--foreground)",
+                            fontFamily: "var(--font-mono)",
                           }}
                         />
                         <Line
@@ -495,7 +501,8 @@ export default function PenduloPublicoPage({
                           name="Período (s)"
                           stroke="var(--chart-1)"
                           strokeWidth={2}
-                          dot={{ r: 3 }}
+                          dot={false}
+                          isAnimationActive={false}
                           connectNulls
                         />
                       </LineChart>

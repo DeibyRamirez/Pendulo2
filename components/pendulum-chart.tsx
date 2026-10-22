@@ -56,11 +56,11 @@ export function PendulumChart({ data: externalData }: PendulumChartProps = {}) {
         const newTime = lastTime + 0.1
         const angle = 15 * Math.cos(2 * Math.PI * newTime / 2.01) * Math.exp(-0.02 * newTime)
         const velocity = -15 * (2 * Math.PI / 2.01) * Math.sin(2 * Math.PI * newTime / 2.01) * Math.exp(-0.02 * newTime)
-        
+
         newData.push({
           time: newTime.toFixed(1),
-          angle: angle + (Math.random() - 0.5) * 0.5, // Add small noise
-          velocity: velocity + (Math.random() - 0.5) * 0.5,
+          angle,
+          velocity,
         })
         return newData
       })
@@ -80,47 +80,53 @@ export function PendulumChart({ data: externalData }: PendulumChartProps = {}) {
   }
 
   return (
-    <div className="h-[300px] w-full">
+    <div className="grafica h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-          <XAxis 
-            dataKey="time" 
-            className="text-xs fill-muted-foreground"
-            tick={{ fill: 'var(--muted-foreground)' }}
-            label={{ value: 'Tiempo (s)', position: 'insideBottom', offset: -5, fill: 'var(--muted-foreground)' }}
+          <CartesianGrid stroke="rgba(247,245,241,.06)" />
+          <XAxis
+            dataKey="time"
+            tick={{ fill: '#9a9ba0', fontSize: 11, fontFamily: 'var(--font-mono)' }}
+            axisLine={false}
+            tickLine={false}
+            label={{ value: 'Tiempo (s)', position: 'insideBottom', offset: -5, fill: '#9a9ba0', fontSize: 11 }}
           />
-          <YAxis 
-            className="text-xs fill-muted-foreground"
-            tick={{ fill: 'var(--muted-foreground)' }}
-            label={{ value: 'Valor', angle: -90, position: 'insideLeft', fill: 'var(--muted-foreground)' }}
+          <YAxis
+            tick={{ fill: '#9a9ba0', fontSize: 11, fontFamily: 'var(--font-mono)' }}
+            axisLine={false}
+            tickLine={false}
+            label={{ value: 'Valor', angle: -90, position: 'insideLeft', fill: '#9a9ba0', fontSize: 11 }}
           />
-          <Tooltip 
-            contentStyle={{ 
-              backgroundColor: 'var(--card)', 
+          <Tooltip
+            contentStyle={{
+              backgroundColor: 'var(--card)',
               border: '1px solid var(--border)',
-              borderRadius: '8px',
-              color: 'var(--foreground)'
+              borderRadius: '6px',
+              color: 'var(--foreground)',
+              fontFamily: 'var(--font-mono)',
             }}
-            labelStyle={{ color: 'var(--muted-foreground)' }}
+            labelStyle={{ color: '#9a9ba0' }}
           />
-          <Legend />
-          <Line 
-            type="monotone" 
-            dataKey="angle" 
+          <Legend wrapperStyle={{ fontFamily: 'var(--font-mono)', fontSize: 11 }} />
+          <Line
+            type="monotone"
+            dataKey="angle"
             name="Ángulo (°)"
-            stroke="var(--chart-1)" 
+            stroke="var(--chart-1)"
             strokeWidth={2}
             dot={false}
+            isAnimationActive={false}
             activeDot={{ r: 4 }}
           />
-          <Line 
-            type="monotone" 
-            dataKey="velocity" 
+          <Line
+            type="monotone"
+            dataKey="velocity"
             name="Velocidad (rad/s)"
-            stroke="var(--chart-2)" 
-            strokeWidth={2}
+            stroke="var(--chart-2)"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
             dot={false}
+            isAnimationActive={false}
             activeDot={{ r: 4 }}
           />
         </LineChart>

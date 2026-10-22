@@ -83,8 +83,8 @@ export default function AgenteIAPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="hidden sm:flex items-center gap-1.5 rounded-full border border-[rgb(62_224_143/0.35)] bg-[rgb(62_224_143/0.12)] px-2.5 py-1 font-mono text-[.6875rem] uppercase tracking-[.14em] text-[var(--color-ok)]">
+            <span className="latido h-1.5 w-1.5 rounded-full bg-[var(--color-ok)]" />
             En línea
           </span>
           {mensajes.length > 0 && (

@@ -54,26 +54,26 @@ const toCityFromInstitution = (institucion: string) => {
 const getEstadoColor = (estado: string) => {
   switch (estado) {
     case "Activo":
-      return "bg-green-500"
+      return "bg-[var(--color-ok)]"
     case "En_uso":
-      return "bg-red-500"
+      return "bg-[var(--color-error)]"
     case "En_mantenimiento":
-      return "bg-gray-500"
+      return "bg-[var(--color-niebla)]"
     default:
-      return "bg-yellow-500"
+      return "bg-[var(--color-serie-3)]"
   }
 }
 
 const getEstadoBadge = (estado: string) => {
   switch (estado) {
     case "Activo":
-      return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Disponible</Badge>
+      return <Badge className="bg-[rgb(62_224_143/0.16)] text-[var(--color-ok)] border-[rgb(62_224_143/0.35)]">Disponible</Badge>
     case "En_uso":
-      return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">En uso</Badge>
+      return <Badge className="bg-[rgb(255_107_107/0.16)] text-[var(--color-error)] border-[rgb(255_107_107/0.35)]">En uso</Badge>
     case "En_mantenimiento":
-      return <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">Mantenimiento</Badge>
+      return <Badge className="bg-secondary text-muted-foreground border-border">Mantenimiento</Badge>
     default:
-      return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Inactivo</Badge>
+      return <Badge className="bg-[rgb(255_201_74/0.16)] text-[var(--color-serie-3)] border-[rgb(255_201_74/0.35)]">Inactivo</Badge>
   }
 }
 
@@ -105,12 +105,12 @@ function ListaNodosPanel({
             </div>
             <p className="text-2xl font-bold">{stats.totalPendulos}</p>
           </div>
-          <div className="p-3 rounded-lg bg-green-500/10">
-            <div className="flex items-center gap-2 text-green-400 mb-1">
+          <div className="p-3 rounded-lg bg-[rgb(62_224_143/0.1)]">
+            <div className="flex items-center gap-2 text-[var(--color-ok)] mb-1">
               <Activity className="w-4 h-4" />
               <span className="text-xs">Disponibles</span>
             </div>
-            <p className="text-2xl font-bold text-green-400">{stats.activos}</p>
+            <p className="num text-2xl font-medium text-[var(--color-ok)]">{stats.activos}</p>
           </div>
         </div>
       </div>

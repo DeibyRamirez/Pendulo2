@@ -38,9 +38,12 @@ export function Footer() {
   const [openFaq, setOpenFaq] = useState<number | null>(0)
 
   return (
-    <footer className="border-t border-border bg-card">
-      <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
-        <div className="grid gap-8 lg:grid-cols-4">
+    <footer className="border-t border-border bg-background">
+      <div className="mx-auto max-w-[1180px] px-5 py-16 md:px-8">
+        <p className="font-display text-[clamp(3rem,8vw,5.5rem)] font-semibold leading-none tracking-[-0.04em] text-[var(--color-linea-fuerte)]">
+          {SIGLA_PROYECTO} · UAC
+        </p>
+        <div className="mt-10 grid gap-8 lg:grid-cols-4">
           {/* Brand */}
           <div className="lg:col-span-1">
             <div className="flex items-center gap-2 mb-4">
@@ -139,13 +142,13 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">
-            {new Date().getFullYear()} {NOMBRE_PROYECTO}. Todos los derechos reservados.
+        <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-border pt-8 sm:flex-row sm:items-center">
+          <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">
+            {new Date().getFullYear()} {NOMBRE_PROYECTO}
           </p>
-          <div className="flex items-center gap-6 text-xs text-muted-foreground">
-            <span>Corporación Universitaria Autónoma del Cauca</span>
-          </div>
+          <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">
+            Corporación Universitaria Autónoma del Cauca
+          </p>
         </div>
       </div>
     </footer>

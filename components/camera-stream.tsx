@@ -63,10 +63,10 @@ export function CameraStream({ penduloId = "UAC-01" }: CameraStreamProps) {
 
   const colorEstado =
     estadoConexion === "conectado"
-      ? "bg-green-500"
+      ? "bg-[var(--color-ok)]"
       : estadoConexion === "conectando"
-        ? "bg-yellow-500 animate-pulse"
-        : "bg-red-500"
+        ? "bg-[var(--color-serie-3)]"
+        : "bg-[var(--color-error)]"
 
   const textoEstado =
     estadoConexion === "conectado"
@@ -95,7 +95,7 @@ export function CameraStream({ penduloId = "UAC-01" }: CameraStreamProps) {
           </CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-xs">
-              <span className={`w-2 h-2 rounded-full mr-2 ${colorEstado}`} />
+              <span className={`mr-2 h-1.5 w-1.5 rounded-full ${colorEstado} ${estadoConexion === "conectado" ? "latido" : ""}`} />
               {textoEstado}
             </Badge>
             {pantallaCompleta && (

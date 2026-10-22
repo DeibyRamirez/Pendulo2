@@ -39,14 +39,17 @@ function log(
   const hasDetails = details && Object.keys(details).length > 0
 
   if (level === 'error') {
-    hasDetails ? console.error(tag, message, details) : console.error(tag, message)
+    if (hasDetails) console.error(tag, message, details)
+    else console.error(tag, message)
     return
   }
   if (level === 'warn') {
-    hasDetails ? console.warn(tag, message, details) : console.warn(tag, message)
+    if (hasDetails) console.warn(tag, message, details)
+    else console.warn(tag, message)
     return
   }
-  hasDetails ? console.info(tag, message, details) : console.info(tag, message)
+  if (hasDetails) console.info(tag, message, details)
+  else console.info(tag, message)
 }
 
 export const penduloDiag = {

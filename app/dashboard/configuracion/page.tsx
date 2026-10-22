@@ -97,21 +97,21 @@ export default function ConfiguracionPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
-                <div className="h-3 w-3 rounded-full bg-chart-3 animate-pulse" />
+                <div className="latido h-3 w-3 rounded-full bg-[var(--color-ok)]" />
                 <span className="text-sm font-medium">Raspberry Pi</span>
               </div>
-              <span className="text-sm text-chart-3">Conectado</span>
+                <span className="text-sm text-[var(--color-ok)]">Conectado</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
-                <div className="h-3 w-3 rounded-full bg-chart-3" />
+                <div className="h-3 w-3 rounded-full bg-[var(--color-ok)]" />
                 <span className="text-sm font-medium">Sensores</span>
               </div>
-              <span className="text-sm text-chart-3">Operativos</span>
+              <span className="text-sm text-[var(--color-ok)]">Operativos</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
-                <div className="h-3 w-3 rounded-full bg-chart-3" />
+                <div className="h-3 w-3 rounded-full bg-[var(--color-ok)]" />
                 <span className="text-sm font-medium">Frecuencia de muestreo</span>
               </div>
               <span className="text-sm text-foreground font-mono">10 Hz</span>
@@ -131,10 +131,10 @@ export default function ConfiguracionPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
-                <div className="h-3 w-3 rounded-full bg-chart-3" />
+                <div className="h-3 w-3 rounded-full bg-[var(--color-ok)]" />
                 <span className="text-sm font-medium">Firebase Realtime</span>
               </div>
-              <span className="text-sm text-chart-3">Sincronizado</span>
+              <span className="text-sm text-[var(--color-ok)]">Sincronizado</span>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
@@ -172,7 +172,7 @@ export default function ConfiguracionPage() {
                   </div>
                   <div>
                     <p className="font-medium text-foreground">Email SMTP</p>
-                    <p className="text-xs text-chart-3">Configurado</p>
+                    <p className="text-xs text-[var(--color-ok)]">Configurado</p>
                   </div>
                 </div>
                 <Button variant="outline" size="sm" className="w-full">Configurar</Button>
@@ -184,7 +184,7 @@ export default function ConfiguracionPage() {
                   </div>
                   <div>
                     <p className="font-medium text-foreground">Firebase</p>
-                    <p className="text-xs text-chart-3">Conectado</p>
+                    <p className="text-xs text-[var(--color-ok)]">Conectado</p>
                   </div>
                 </div>
                 <Button variant="outline" size="sm" className="w-full">Configurar</Button>

@@ -127,13 +127,13 @@ export default function FormularioReservacion() {
       <h2 className="text-2xl font-bold mb-6">Nueva Reservación</h2>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+        <div className="mb-4 rounded-md border border-[var(--color-error)] p-4 text-[var(--color-error)]">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+        <div className="mb-4 rounded-md border border-[var(--color-ok)] p-4 text-[var(--color-ok)]">
           ¡Reservación creada exitosamente!
         </div>
       )}

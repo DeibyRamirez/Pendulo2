@@ -750,8 +750,8 @@ export default function RealtimePage() {
                 Práctica finalizada
               </Badge>
             ) : hayDatosEnVivo ? (
-              <Badge variant="outline" className="border-chart-3 text-chart-3">
-                <span className="h-2 w-2 rounded-full bg-chart-3 animate-pulse mr-1.5" />
+              <Badge variant="outline" className="border-[var(--color-ok)] text-[var(--color-ok)]">
+                <span className="latido mr-1.5 h-2 w-2 rounded-full bg-[var(--color-ok)]" />
                 En vivo
               </Badge>
             ) : (
@@ -988,7 +988,7 @@ export default function RealtimePage() {
           <CardContent className="space-y-4">
             <div className="flex flex-col items-center justify-center py-4">
               <div className={`h-16 w-16 rounded-full flex items-center justify-center ${hayDatosEnVivo ? "bg-chart-3/20" : "bg-muted"}`}>
-                <Gauge className={`h-8 w-8 ${hayDatosEnVivo ? "text-chart-3" : "text-muted-foreground"} ${hayDatosEnVivo ? "animate-pulse" : ""}`} />
+                <Gauge className={`h-8 w-8 ${hayDatosEnVivo ? "text-[var(--color-ok)]" : "text-muted-foreground"}`} />
               </div>
               <p className="text-3xl font-bold font-mono mt-3">{enVivo?.muestras ?? "--"}</p>
               <p className="text-xs text-muted-foreground">muestras capturadas</p>
@@ -1071,6 +1071,8 @@ export default function RealtimePage() {
               dataKey="periodo"
               label="Período (s)"
               color="var(--chart-1)"
+              width={2}
+              dash="0"
               maxMuestras={maxMuestrasGrafica}
             />
           </CardContent>
@@ -1089,6 +1091,8 @@ export default function RealtimePage() {
               dataKey="gravedad"
               label="Gravedad"
               color="var(--chart-2)"
+              width={1.5}
+              dash="6 4"
               maxMuestras={maxMuestrasGrafica}
             />
           </CardContent>
@@ -1107,6 +1111,8 @@ export default function RealtimePage() {
               dataKey="frecuencia"
               label="Frecuencia (Hz)"
               color="var(--chart-3)"
+              width={1.5}
+              dash="4 3"
               maxMuestras={maxMuestrasGrafica}
             />
           </CardContent>
@@ -1125,6 +1131,8 @@ export default function RealtimePage() {
               dataKey="temperatura"
               label="Temperatura (°C)"
               color="var(--chart-4)"
+              width={1.5}
+              dash="1 4"
               maxMuestras={maxMuestrasGrafica}
             />
           </CardContent>
@@ -1207,12 +1215,16 @@ function MetricChart({
   label,
   color,
   maxMuestras,
+  dash = "0",
+  width = 2,
 }: {
   data: MetricChartPoint[]
   dataKey: string
   label: string
   color: string
   maxMuestras: number
+  dash?: string
+  width?: number
 }) {
   const ticks = Array.from({ length: maxMuestras }, (_, i) => i + 1)
 
@@ -1225,10 +1237,10 @@ function MetricChart({
   }
 
   return (
-    <div className="h-[260px] w-full">
+    <div className="grafica h-56 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+          <CartesianGrid stroke="rgba(247,245,241,.06)" />
           <XAxis
             type="number"
             dataKey="muestra"
@@ -1236,31 +1248,36 @@ function MetricChart({
             ticks={ticks}
             interval={0}
             allowDecimals={false}
-            className="text-xs fill-muted-foreground"
-            tick={{ fill: "var(--muted-foreground)", fontSize: maxMuestras > 12 ? 10 : 12 }}
-            label={{ value: "Muestra", position: "insideBottom", offset: -5, fill: "var(--muted-foreground)" }}
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: "#9a9ba0", fontSize: 11, fontFamily: "var(--font-mono)" }}
+            label={{ value: "Muestra", position: "insideBottom", offset: -5, fill: "#9a9ba0", fontSize: 11 }}
           />
           <YAxis
-            className="text-xs fill-muted-foreground"
-            tick={{ fill: "var(--muted-foreground)" }}
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: "#9a9ba0", fontSize: 11, fontFamily: "var(--font-mono)" }}
             domain={["auto", "auto"]}
           />
           <Tooltip
             contentStyle={{
               backgroundColor: "var(--card)",
               border: "1px solid var(--border)",
-              borderRadius: "8px",
+              borderRadius: "6px",
               color: "var(--foreground)",
+              fontFamily: "var(--font-mono)",
             }}
-            labelStyle={{ color: "var(--muted-foreground)" }}
+            labelStyle={{ color: "#9a9ba0" }}
           />
           <Line
             type="monotone"
             dataKey={dataKey}
             name={label}
             stroke={color}
-            strokeWidth={2}
-            dot={{ r: 3 }}
+            strokeWidth={width}
+            strokeDasharray={dash}
+            dot={false}
+            isAnimationActive={false}
             connectNulls
           />
         </LineChart>
