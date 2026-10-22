@@ -31,7 +31,10 @@ export function escucharEstadisticasPublicas(callback, onError) {
       });
     },
     (error) => {
-      console.error('Error al escuchar estadísticas públicas:', error);
+      console.error('Error al escuchar estadísticas públicas:', error, {
+        path: 'configuracion/estadisticas_publicas',
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '(sin NEXT_PUBLIC_FIREBASE_PROJECT_ID)',
+      });
       if (onError) onError(error);
     },
   );

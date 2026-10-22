@@ -34,9 +34,10 @@ export function useEstadisticasLanding() {
       (err) => {
         setCargandoPublicas(false);
         const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+        const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() || '(no definido en .env.local)';
         setErrorPublicas(
           code === 'permission-denied'
-            ? 'Sin permiso para leer estadísticas públicas. Revisa firestore.rules y el projectId.'
+            ? `Sin permiso para leer estadísticas públicas (proyecto Firebase: ${projectId}). Publica firestore.rules en ese mismo proyecto: lectura anónima de configuracion/estadisticas_publicas.`
             : 'No se pudieron cargar experimentos ni estudiantes registrados.',
         );
       },
