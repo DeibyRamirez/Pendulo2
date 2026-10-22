@@ -9,6 +9,7 @@ import {
   escucharReservacionesUsuario,
   validarConflictosHorario,
 } from '@/app/services/reservacionService';
+import { marcarTiempo } from '@/lib/marcarTiempo';
 
 export type EstadoReservacion = 'pending' | 'active' | 'completed' | 'cancelled';
 
@@ -59,9 +60,15 @@ export function useReservations(usuario_id: string): UseReservationsResult {
     if (!usuario_id) return;
 
     setLoading(true);
+    const inicio = marcarTiempo('reservas-inicio');
+    let primera = true;
     const unsubscribe = escucharReservacionesUsuario(
       usuario_id,
       (data: Reservacion[]) => {
+        if (primera) {
+          primera = false;
+          marcarTiempo('reservas-snapshot', inicio);
+        }
         setReservaciones(data || []);
         setLoading(false);
       },

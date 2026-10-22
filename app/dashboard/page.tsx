@@ -11,6 +11,7 @@ import { Timestamp } from "firebase/firestore";
 import { useReservations } from "@/hooks/useReservations";
 import { listarPracticasDeUsuario } from "@/app/services/penduloDataService";
 import { useModuloEvaluacion } from "@/hooks/useModuloEvaluacion";
+import { marcarTiempo } from "@/lib/marcarTiempo";
 
 const PENDULO_PREDETERMINADO = "UAC-01";
 
@@ -43,21 +44,38 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user?.uid) return;
     let cancelado = false;
-    listarPracticasDeUsuario(user.uid, penduloIds)
-      .then((data: { practicaId: string }[]) => {
-        if (!cancelado) setPracticasRealizadas(data.length);
-      })
-      .catch(() => {
-        if (!cancelado) {
-          const desdeReservas = reservaciones.reduce(
-            (acc, r) => acc + (r.practicas_realizadas ?? 0),
-            0,
-          );
-          setPracticasRealizadas(desdeReservas);
-        }
-      });
+    const uid = user.uid;
+    const cargar = () => {
+      const inicio = marcarTiempo("practicas-inicio");
+      listarPracticasDeUsuario(uid, penduloIds)
+        .then((data: { practicaId: string }[]) => {
+          if (!cancelado) setPracticasRealizadas(data.length);
+        })
+        .catch(() => {
+          if (!cancelado) {
+            const desdeReservas = reservaciones.reduce(
+              (acc, r) => acc + (r.practicas_realizadas ?? 0),
+              0,
+            );
+            setPracticasRealizadas(desdeReservas);
+          }
+        })
+        .finally(() => {
+          if (!cancelado) marcarTiempo("practicas-fin", inicio);
+        });
+    };
+    // El saludo ya está en pantalla; las prácticas no compiten con el primer pintado.
+    let idleId: number | undefined;
+    let timerId: number | undefined;
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(cargar, { timeout: 1500 });
+    } else {
+      timerId = window.setTimeout(cargar, 1);
+    }
     return () => {
       cancelado = true;
+      if (idleId != null) window.cancelIdleCallback(idleId);
+      if (timerId != null) window.clearTimeout(timerId);
     };
   }, [user?.uid, penduloIds, reservaciones]);
 

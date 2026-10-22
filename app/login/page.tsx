@@ -1,12 +1,10 @@
 "use client"
 
-import { useState } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
-import { iniciarSesion, iniciarSesionConGoogle, obtenerPerfilUsuario, perfilTieneInstitucion, obtenerRutaDashboardPorRol, procesarRetornoGoogle } from '../services/authService';
-import { useAuth } from '@/hooks/useAuth';
-import { getDashboardPathByRole } from '@/lib/roles';
+import { esperarAuthListo, iniciarSesion, iniciarSesionConGoogle, obtenerPerfilUsuario, perfilTieneInstitucion, obtenerRutaDashboardPorRol, procesarRetornoGoogle } from '../services/authService';
+import { marcarTiempo } from '@/lib/marcarTiempo';
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,7 +15,6 @@ import { NOMBRE_PROYECTO, NOMBRE_RED, SIGLA_PROYECTO } from "@/lib/marca"
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, rol } = useAuth();
 
   // Estado del formulario
   const [email, setEmail]           = useState('');
@@ -28,14 +25,14 @@ export default function LoginPage() {
   const [isLoading, setIsLoading]   = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError]           = useState('');
-  const [loginIntent, setLoginIntent] = useState(false);
 
   useEffect(() => {
-    if (loginIntent && user) {
-      router.push(`/${getDashboardPathByRole(rol)}`);
-      setLoginIntent(false);
-    }
-  }, [loginIntent, user, rol, router]);
+    const inicio = marcarTiempo('pagina');
+    router.prefetch('/dashboard');
+    router.prefetch('/docente');
+    router.prefetch('/admin');
+    void esperarAuthListo().then(() => marcarTiempo('auth-listo', inicio));
+  }, [router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,15 +110,19 @@ export default function LoginPage() {
      evento.preventDefault();
      setError('');
      setIsLoading(true);
+     const inicio = marcarTiempo('clic');
 
       try {
-        await iniciarSesion(email, password);
-        setLoginIntent(true);
+        const credencial = await iniciarSesion(email, password);
+        marcarTiempo('sign-in', inicio);
+        const perfil = await obtenerPerfilUsuario(credencial.user.uid);
+        marcarTiempo('perfil', inicio);
+        router.push(`/${obtenerRutaDashboardPorRol(perfil?.rol)}`);
+        marcarTiempo('navegacion', inicio);
       } catch (err) {
-       // Mostrar error traducido al usuario
+       marcarTiempo('sign-in-error', inicio);
        const authError = err as AuthError;
        setError(traducirError(authError.code));
-     } finally {
        setIsLoading(false);
     }
    }
