@@ -1,11 +1,37 @@
-const stats = [
-  { value: "500+", label: "Experimentos realizados" },
-  { value: "15", label: "Universidades conectadas" },
-  { value: "1,200+", label: "Estudiantes activos" },
-  { value: "99.9%", label: "Disponibilidad del sistema" },
-]
+"use client"
+
+import {
+  formatearContadorLanding,
+  useEstadisticasLanding,
+} from "@/hooks/useEstadisticasLanding"
 
 export function StatsSection() {
+  const {
+    experimentosRealizados,
+    universidadesConectadas,
+    estudiantesRegistrados,
+    loading,
+  } = useEstadisticasLanding()
+
+  const stats = [
+    {
+      value: formatearContadorLanding(experimentosRealizados, loading),
+      label: "Experimentos realizados",
+    },
+    {
+      value: formatearContadorLanding(universidadesConectadas, loading),
+      label: "Universidades conectadas",
+    },
+    {
+      value: formatearContadorLanding(estudiantesRegistrados, loading),
+      label: "Estudiantes registrados",
+    },
+    {
+      value: "99.9%",
+      label: "Disponibilidad del sistema",
+    },
+  ]
+
   return (
     <section className="relative py-24 lg:py-32 bg-card">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
