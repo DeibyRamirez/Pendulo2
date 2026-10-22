@@ -30,12 +30,14 @@ import { getDashboardPathByRole } from "@/lib/roles"
 import { CameraStream } from "@/components/camera-stream"
 import { usePenduloData, type LecturaPendulo } from "@/hooks/usePenduloData"
 import { escucharLecturasPractica } from "@/app/services/penduloDataService"
-import { count } from "console"
-
-const OSCILACIONES_MAX = 20
-const SEGUNDOS_SIN_SENAL = 10
-/** El bridge escribe telemetría en pendulo_data/UAC-01, no en el id numérico del catálogo. */
-const PENDULO_ID_TELEMETRIA = "UAC-01"
+import {
+  OSCILACIONES_MAX,
+  SEGUNDOS_SIN_SENAL,
+  buscarPenduloEnCatalogo,
+  formatNumber,
+  limitarOscilaciones,
+  resolverIdTelemetria,
+} from "@/lib/penduloEnVivo"
 
 interface PuntoPractica {
   muestra: number
@@ -45,29 +47,10 @@ interface PuntoPractica {
   temperatura: number | null
 }
 
-function formatNumber(value: unknown, decimals = 2): string {
-  if (typeof value !== "number" || Number.isNaN(value)) return "—"
-  return value.toFixed(decimals)
-}
-
-function limitarOscilaciones(valor: unknown): number | null {
-  if (typeof valor !== "number" || Number.isNaN(valor)) return null
-  const entero = Math.round(valor)
-  if (entero < 1 || entero > OSCILACIONES_MAX) return null
-  return entero
-}
-
 function etiquetaEstadoCatalogo(estado: string): string {
   if (estado === "En_uso") return "En uso"
   if (estado === "En_mantenimiento") return "En mantenimiento"
   return estado
-}
-
-function resolverIdTelemetria(urlId: string, catalogo: { pendulo_id?: string } | null): string {
-  const delCatalogo = catalogo?.pendulo_id?.trim()
-  if (delCatalogo && /[A-Za-z]/.test(delCatalogo)) return delCatalogo
-  if (urlId && /[A-Za-z]/.test(urlId)) return urlId
-  return PENDULO_ID_TELEMETRIA
 }
 
 export default function PenduloPublicoPage({
@@ -82,17 +65,10 @@ export default function PenduloPublicoPage({
   const [puntosEnVivo, setPuntosEnVivo] = useState<PuntoPractica[]>([])
   const practicaIdAnterior = useRef<string | null>(null)
 
-  const penduloSeleccionado = useMemo(() => {
-    const byId = pendulos.find((p) => p.id === resolvedParams.id)
-    if (byId) return byId
-    const byPenduloId = pendulos.find((p) => p.pendulo_id === resolvedParams.id)
-    if (byPenduloId) return byPenduloId
-    const numericId = Number(resolvedParams.id)
-    if (!Number.isNaN(numericId) && numericId >= 1 && numericId <= pendulos.length) {
-      return pendulos[numericId - 1]
-    }
-    return null
-  }, [pendulos, resolvedParams.id])
+  const penduloSeleccionado = useMemo(
+    () => buscarPenduloEnCatalogo(pendulos, resolvedParams.id),
+    [pendulos, resolvedParams.id],
+  )
 
   const penduloId = resolverIdTelemetria(resolvedParams.id, penduloSeleccionado)
 

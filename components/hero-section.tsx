@@ -5,13 +5,34 @@ import { ArrowRight, Play, ChevronLeft, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { usePendulos } from "@/hooks/usePendulos"
+import { usePenduloData } from "@/hooks/usePenduloData"
+import {
+  buscarPenduloEnCatalogo,
+  esPracticaEnVivo,
+  formatNumber,
+  maxMuestrasDesdeEnVivo,
+  resolverIdTelemetria,
+} from "@/lib/penduloEnVivo"
 import { QRCodeSVG } from "qrcode.react"
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pendulo2.vercel.app/"
+const DEMO_PENDULO_ID = "1"
 
 export function HeroSection() {
   const { pendulos } = usePendulos()
   const [index, setIndex] = useState(0)
+
+  const penduloDemo = useMemo(
+    () => buscarPenduloEnCatalogo(pendulos, DEMO_PENDULO_ID),
+    [pendulos],
+  )
+  const penduloIdTelemetria = useMemo(
+    () => resolverIdTelemetria(DEMO_PENDULO_ID, penduloDemo),
+    [penduloDemo],
+  )
+  const { enVivo, segundosDesdeUltimoDato } = usePenduloData(penduloIdTelemetria)
+  const hayDatosEnVivo = esPracticaEnVivo(enVivo, segundosDesdeUltimoDato)
+  const maxMuestras = maxMuestrasDesdeEnVivo(enVivo)
 
   const items = useMemo(
     () =>
@@ -45,8 +66,10 @@ export function HeroSection() {
           <div className="flex flex-col gap-8">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                Laboratorio Remoto Activo
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${hayDatosEnVivo ? "bg-green-500 animate-pulse" : "bg-primary"}`}
+                />
+                {hayDatosEnVivo ? "En vivo · práctica activa" : "Laboratorio remoto"}
               </span>
             </div>
 
@@ -69,7 +92,7 @@ export function HeroSection() {
                 </Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
-                <Link href="#demo">
+                <Link href="/pendulo/1">
                   <Play className="mr-2 h-4 w-4" />
                   Ver demostración
                 </Link>
@@ -110,7 +133,9 @@ export function HeroSection() {
                   <div className="h-4 w-4 rounded-full bg-primary" />
 
                   {/* Pendulum arm and bob */}
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 origin-top animate-pendulum">
+                  <div
+                    className={`absolute top-2 left-1/2 -translate-x-1/2 origin-top ${hayDatosEnVivo ? "animate-pendulum" : ""}`}
+                  >
                     <div className="h-48 w-0.5 bg-gradient-to-b from-primary to-primary/50" />
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 h-12 w-12 rounded-full bg-primary shadow-lg shadow-primary/50" />
                   </div>
@@ -120,21 +145,59 @@ export function HeroSection() {
                 </div>
               </div>
 
-              {/* Data overlay cards */}
-              <div className="absolute bottom-4 left-4 right-4 flex gap-4">
-                <div className="flex-1 rounded-lg border border-border bg-background/80 backdrop-blur-sm p-3">
-                  <p className="text-xs text-muted-foreground">Ángulo</p>
-                  <p className="text-xl font-bold text-foreground">15.7°</p>
+              {/* Telemetría en vivo (solo durante práctica activa) */}
+              <div className="absolute bottom-4 left-4 right-4 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+                <div className="rounded-lg border border-border bg-background/80 backdrop-blur-sm p-3">
+                  <p className="text-xs text-muted-foreground">Temperatura</p>
+                  <p className="text-lg font-bold font-mono text-foreground sm:text-xl">
+                    {hayDatosEnVivo ? (
+                      <>
+                        {formatNumber(enVivo?.temperatura, 2)}
+                        <span className="text-sm font-normal text-muted-foreground"> °C</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </p>
                 </div>
-                <div className="flex-1 rounded-lg border border-border bg-background/80 backdrop-blur-sm p-3">
-                  <p className="text-xs text-muted-foreground">Velocidad</p>
-                  <p className="text-xl font-bold text-foreground">0.42 m/s</p>
-                </div>
-                <div className="flex-1 rounded-lg border border-border bg-background/80 backdrop-blur-sm p-3">
+                <div className="rounded-lg border border-border bg-background/80 backdrop-blur-sm p-3">
                   <p className="text-xs text-muted-foreground">Período</p>
-                  <p className="text-xl font-bold text-foreground">2.01 s</p>
+                  <p className="text-lg font-bold font-mono text-foreground sm:text-xl">
+                    {hayDatosEnVivo ? (
+                      <>
+                        {formatNumber(enVivo?.periodo, 3)}
+                        <span className="text-sm font-normal text-muted-foreground"> s</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border bg-background/80 backdrop-blur-sm p-3">
+                  <p className="text-xs text-muted-foreground">Oscilaciones</p>
+                  <p className="text-lg font-bold font-mono text-foreground sm:text-xl">
+                    {hayDatosEnVivo && typeof enVivo?.muestras === "number" ? (
+                      <>
+                        {formatNumber(enVivo.muestras, 0)}
+                        <span className="text-sm font-normal text-muted-foreground"> / {maxMuestras}</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border bg-background/80 backdrop-blur-sm p-3">
+                  <p className="text-xs text-muted-foreground">Gravedad</p>
+                  <p className="text-lg font-bold font-mono text-foreground sm:text-xl">
+                    {hayDatosEnVivo ? formatNumber(enVivo?.gravedad, 3) : "—"}
+                  </p>
                 </div>
               </div>
+              {!hayDatosEnVivo && (
+                <p className="absolute bottom-1 left-4 right-4 text-center text-[10px] text-muted-foreground sm:text-xs">
+                  Sin práctica en curso
+                </p>
+              )}
 
 
             </div>
