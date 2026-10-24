@@ -312,6 +312,16 @@
       filter: none;
       opacity: 1;
     }
+
+    .arch-flow .arch-node:hover {
+      border-color: rgb(232 93 4 / .5);
+      box-shadow: 0 8px 24px -12px rgb(0 0 0 / .45);
+      transform: translateY(-2px);
+    }
+
+    .arch-flow .arch-node:hover .arch-node-icon {
+      transform: scale(1.05);
+    }
   }
 }
 

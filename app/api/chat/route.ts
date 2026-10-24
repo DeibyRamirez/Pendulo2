@@ -1,7 +1,7 @@
 // app/api/chat/route.ts
 
-import { applicationDefault, cert, getApps, initializeApp, type ServiceAccount } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getAdminApp } from "@/lib/firebaseAdmin";
 import { MODEL_CONFIG, PHYSICS_SYSTEM_PROMPT } from "@/lib/physics-context";
 import { NextResponse } from "next/server";
 
@@ -18,14 +18,7 @@ interface RequestBody {
 // La cuenta de servicio (GOOGLE_SERVICE_ACCOUNT_JSON) o ADC pertenece al mismo
 // proyecto que Firebase Auth, así que verifyIdToken valida los ID tokens web.
 function obtenerAuthAdmin() {
-  if (getApps().length === 0) {
-    const saJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-    const credencial = saJson
-      ? cert(JSON.parse(saJson) as ServiceAccount)
-      : applicationDefault();
-    initializeApp({ credential: credencial });
-  }
-  return getAuth();
+  return getAuth(getAdminApp());
 }
 
 async function obtenerUidAutenticado(request: Request): Promise<string | null> {

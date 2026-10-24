@@ -3,11 +3,13 @@ export function SectionHeader({
   kicker,
   title,
   lead,
+  titleId,
 }: {
   index: string
   kicker: string
   title: string
   lead?: string
+  titleId?: string
 }) {
   return (
     <header className="max-w-3xl">
@@ -20,7 +22,10 @@ export function SectionHeader({
           className="h-px flex-1 bg-[linear-gradient(90deg,var(--border),transparent)]"
         />
       </div>
-      <h2 className="mt-4 font-display text-titulo font-semibold leading-[.95] tracking-[-0.035em] text-foreground">
+      <h2
+        id={titleId}
+        className="mt-4 font-display text-titulo font-semibold leading-[.95] tracking-[-0.035em] text-foreground"
+      >
         {title}
       </h2>
       {lead ? (

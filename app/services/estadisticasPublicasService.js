@@ -1,5 +1,7 @@
 import {
+  collectionGroup,
   doc,
+  getCountFromServer,
   onSnapshot,
   setDoc,
   updateDoc,
@@ -12,7 +14,16 @@ export const REF_ESTADISTICAS_PUBLICAS = doc(db, 'configuracion', 'estadisticas_
 
 /**
  * Contadores agregados para la landing (lectura pública).
- * Sin backfill admin, arrancan en 0 hasta nuevos registros o prácticas.
+ * experimentosRealizados = total global de muestras (docs en subcolecciones lecturas).
+ * estudiantesRegistrados = total de documentos en usuarios (todos los roles).
+ * Sin backfill admin, arrancan en 0 hasta recálculo o nuevos eventos.
+ */
+
+/**
+ * @typedef {{ estudiantesRegistrados: number, experimentosRealizados: number }} EstadisticasPublicas
+ * @param {(data: EstadisticasPublicas) => void} callback
+ * @param {(error: import('firebase/firestore').FirestoreError) => void} [onError]
+ * @returns {import('firebase/firestore').Unsubscribe}
  */
 export function escucharEstadisticasPublicas(callback, onError) {
   return onSnapshot(
@@ -71,13 +82,14 @@ export async function incrementarExperimentoRealizado() {
 
 /**
  * Recalcula contadores desde datos que solo el admin puede leer en cliente.
+ * @param {unknown[]} usuarios
+ * @param {unknown} _reservaciones Reservado por compatibilidad con admin; ya no define experimentos.
  */
-export async function recalcularEstadisticasPublicasDesdeAdmin(usuarios, reservaciones) {
-  const estudiantesRegistrados = (usuarios || []).filter((u) => u.rol === 'Estudiante').length;
-  const experimentosRealizados = (reservaciones || []).reduce(
-    (acc, r) => acc + (r.practicas_realizadas ?? 0),
-    0,
-  );
+export async function recalcularEstadisticasPublicasDesdeAdmin(usuarios, _reservaciones) {
+  const estudiantesRegistrados = (usuarios || []).length;
+  const lecturasQuery = collectionGroup(db, 'lecturas');
+  const lecturasSnap = await getCountFromServer(lecturasQuery);
+  const experimentosRealizados = lecturasSnap.data().count;
 
   await setDoc(
     REF_ESTADISTICAS_PUBLICAS,

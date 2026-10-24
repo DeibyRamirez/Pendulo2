@@ -18,6 +18,8 @@ type Pendulo = {
 type Props = {
   pendulos: Pendulo[]
   onSelect: (pendulo: Pendulo) => void
+  /** Cambia al abrir/cerrar paneles laterales para forzar recálculo del tamaño del mapa. */
+  layoutKey?: boolean
 }
 
 function markerColor(estado: string) {
@@ -27,7 +29,7 @@ function markerColor(estado: string) {
   return "#ca8a04"
 }
 
-export default function MapaLeaflet({ pendulos, onSelect }: Props) {
+export default function MapaLeaflet({ pendulos, onSelect, layoutKey }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const markersRef = useRef<L.Marker[]>([])
@@ -54,13 +56,28 @@ export default function MapaLeaflet({ pendulos, onSelect }: Props) {
 
     mapRef.current = map
 
+    const onResize = () => {
+      map.invalidateSize()
+    }
+    window.addEventListener("resize", onResize)
+
     return () => {
+      window.removeEventListener("resize", onResize)
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current = null
       }
     }
   }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const id = window.requestAnimationFrame(() => {
+      map.invalidateSize()
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [layoutKey])
 
   useEffect(() => {
     const map = mapRef.current

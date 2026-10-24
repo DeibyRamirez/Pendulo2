@@ -89,21 +89,58 @@ Volver a «cargar reglas» en otro proyecto o pegar reglas antiguas (`allow read
 
 Consola (F12): busca `Error al escuchar estadísticas públicas` con `path` y `projectId`.
 
-## 4. Después de que la lectura funcione
+## 4. API de conteos (Firebase Admin)
 
-- Firestore → Datos → `configuracion` → `estadisticas_publicas` (puede no existir; entonces verás **0**).
-- **Admin** → «Recalcular estadísticas públicas» (una vez) para contadores históricos.
+La home llama a `GET /api/estadisticas-landing` al cargar (misma lógica que admin: count en `usuarios` + `collectionGroup('lecturas')`). La ruta sincroniza `configuracion/estadisticas_publicas` para el `onSnapshot` en cliente.
 
-## 5. Comportamiento esperado
+Variables de entorno (mismo proyecto que Auth/Firestore):
 
-| UI | Sin práctica / sin backfill |
-|----|-----------------------------|
+**Windows / local (recomendado)** — no pegues el JSON entero en `.env.local`:
+
+1. Descarga la clave en Firebase Console → Cuentas de servicio → **SDK de administración de Firebase**.
+2. Guárdala como `secrets/firebase-adminsdk.json` (carpeta ignorada por git).
+3. En `.env.local`:
+
+```text
+GOOGLE_APPLICATION_CREDENTIALS=D:\Proyectos\Pendulo2\secrets\firebase-adminsdk.json
+```
+
+Comenta o borra `GOOGLE_SERVICE_ACCOUNT_JSON` si te da `SyntaxError` al parsear JSON.
+
+**Vercel** — suele usarse una sola línea:
+
+```text
+GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+```
+
+Sin credencial, la API responde **503**; la landing puede seguir con el documento público si existe (p. ej. tras **Recalcular estadísticas públicas** en admin).
+
+Si en consola aparece `PERMISSION_DENIED` al contar `usuarios` o `lecturas`, la clave en `GOOGLE_SERVICE_ACCOUNT_JSON` **no tiene rol de Firestore** (suele pasar si la clave es solo para Auth/Vertex). Solución:
+
+1. [Google Cloud IAM](https://console.cloud.google.com/iam-admin/iam) → busca el `client_email` del JSON → añade **Cloud Datastore User** (o regenera clave en Firebase → Cuentas de servicio → **SDK de administración de Firebase**).
+2. O en **Admin** → «Recalcular estadísticas públicas» (rellena `estadisticas_publicas` sin pasar por el count del servidor).
+
+Prueba rápida:
+
+```powershell
+curl http://localhost:3000/api/estadisticas-landing
+```
+
+## 5. Después de que la lectura funcione
+
+- Firestore → Datos → `configuracion` → `estadisticas_publicas` (la API o **Admin** → «Recalcular estadísticas públicas» lo rellenan).
+- **Admin** → «Recalcular estadísticas públicas» (opcional) si quieres forzar conteos desde el panel sin pasar por la API.
+
+## 6. Comportamiento esperado
+
+| UI | Sin credencial Admin / sin backfill |
+|----|-------------------------------------|
 | Hero (telemetría) | `—` y demo/sin señal (normal) |
 | Universidades | Número real desde `pendulos` (p. ej. 1) |
-| Experimentos / estudiantes | `0` hasta backfill o nuevos eventos |
+| Experimentos (muestras globales) / estudiantes (usuarios totales) | API + doc público; `0` solo si fallan API y doc vacío |
 | Disponibilidad | `99.9%` fijo |
 
-## 6. Causas menos frecuentes
+## 7. Causas menos frecuentes
 
 - **App Check** forzado sin token en dev.
 - Base de datos Firestore **no default** (el SDK usa la default en [`app/services/firebase.js`](../app/services/firebase.js)).

@@ -111,7 +111,6 @@ export function PendulumStage({
         </div>
         <div className="relative mx-5 mt-2 aspect-[4/3] md:aspect-auto md:h-[340px]">
           <svg viewBox="0 0 360 280" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden>
-            <line x1="180" y1="28" x2="180" y2="250" stroke="#9a9ba0" strokeWidth="1" strokeDasharray="2 6" />
             <path
               d="M 48 196 A 150 150 0 0 1 312 196"
               fill="none"
@@ -120,15 +119,15 @@ export function PendulumStage({
               strokeDasharray="2 5"
             />
           </svg>
-          <div className="absolute left-1/2 top-3 h-[78%] w-8 -translate-x-1/2">
-            <div className="absolute left-1/2 top-0 size-2 -translate-x-1/2 rounded-full bg-[var(--color-marfil)]" />
+          <div className="absolute left-1/2 top-3 h-[83%] -translate-x-1/2">
             <div
               ref={armRef}
-              className="absolute left-1/2 top-1 h-[calc(100%-4px)] w-8 -translate-x-1/2"
-              style={{ transformOrigin: 'top center', transform: 'translateX(-50%) rotate(15.7deg)' }}
+              className="flex h-full flex-col items-center"
+              style={{ transformOrigin: 'center 4px' }}
             >
-              <div className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-[var(--color-marfil)]" />
-              <div className="absolute bottom-0 left-1/2 size-7 -translate-x-1/2 rounded-full bg-[var(--color-naranja)]" />
+              <div className="relative z-10 size-2 shrink-0 rounded-full bg-[var(--color-marfil)]" />
+              <div className="-mt-1 w-[1.5px] min-h-0 flex-1 bg-[var(--color-marfil)]" />
+              <div className="size-7 shrink-0 rounded-full bg-[var(--color-naranja)]" />
             </div>
           </div>
           <div className="absolute inset-x-4 bottom-2 flex justify-between font-mono text-[.6875rem] tracking-[.14em] text-muted-foreground">
