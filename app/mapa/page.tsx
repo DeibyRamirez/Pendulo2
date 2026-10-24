@@ -16,7 +16,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { ArrowLeft, Search, MapPin, Activity, Calendar, Globe, Radio, List } from "lucide-react"
+import { ArrowLeft, Search, MapPin, Activity, Calendar, Globe, Radio, List, LogIn } from "lucide-react"
 import { usePendulos } from "@/hooks/usePendulos"
 import { useAuth } from "@/hooks/useAuth"
 import { NOMBRE_RED } from "@/lib/marca"
@@ -103,14 +103,14 @@ function ListaNodosPanel({
               <Radio className="w-4 h-4" />
               <span className="text-xs">Total Nodos</span>
             </div>
-            <p className="text-2xl font-bold">{stats.totalPendulos}</p>
+            <p className="text-xl font-bold sm:text-2xl">{stats.totalPendulos}</p>
           </div>
           <div className="p-3 rounded-lg bg-[rgb(62_224_143/0.1)]">
             <div className="flex items-center gap-2 text-[var(--color-ok)] mb-1">
               <Activity className="w-4 h-4" />
               <span className="text-xs">Disponibles</span>
             </div>
-            <p className="num text-2xl font-medium text-[var(--color-ok)]">{stats.activos}</p>
+            <p className="num text-xl font-medium text-[var(--color-ok)] sm:text-2xl">{stats.activos}</p>
           </div>
         </div>
       </div>
@@ -144,12 +144,12 @@ function ListaNodosPanel({
                   : "border-border bg-card/50 hover:bg-card hover:border-border/80"
               }`}
             >
-              <div className="flex items-start justify-between mb-2 gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${getEstadoColor(pendulo.estado)}`} />
-                  <span className="text-sm font-medium truncate">{pendulo.ciudad}</span>
+              <div className="mb-2 flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className={`h-2 w-2 shrink-0 rounded-full ${getEstadoColor(pendulo.estado)}`} />
+                  <span className="truncate text-sm font-medium">{pendulo.ciudad}</span>
                 </div>
-                {getEstadoBadge(pendulo.estado)}
+                <div className="shrink-0">{getEstadoBadge(pendulo.estado)}</div>
               </div>
               <p className="text-sm text-foreground font-medium mb-1 line-clamp-1">{pendulo.institucion}</p>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -214,8 +214,8 @@ export default function PaginaMapaRed() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50 shrink-0">
-        <div className="container mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
+      <header className="sticky top-0 z-50 shrink-0 border-b border-border bg-card/50 pt-[env(safe-area-inset-top,0px)] backdrop-blur-sm">
+        <div className="container mx-auto flex h-14 items-center justify-between gap-1 px-4 sm:h-16 sm:gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <Link href={obtenerRutaInicioPorRol(rol)}>
               <Button variant="ghost" size="icon" className="touch-target shrink-0" aria-label="Volver al panel">
@@ -232,15 +232,23 @@ export default function PaginaMapaRed() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <Sheet open={listaAbierta} onOpenChange={setListaAbierta}>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="lg:hidden touch-target">
-                  <List className="w-4 h-4 mr-2" />
-                  <span className="hidden xs:inline">Nodos</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="touch-target lg:hidden"
+                  aria-label="Abrir lista de nodos"
+                >
+                  <List className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Nodos</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[min(100vw-2rem,24rem)] p-0 flex flex-col">
+              <SheetContent
+                side="left"
+                className="flex h-[100dvh] max-h-[100dvh] w-[min(100vw-2rem,24rem)] flex-col p-0 pb-[env(safe-area-inset-bottom,0px)]"
+              >
                 <SheetHeader className="p-4 border-b border-border">
                   <SheetTitle>Lista de nodos</SheetTitle>
                 </SheetHeader>
@@ -249,21 +257,25 @@ export default function PaginaMapaRed() {
             </Sheet>
             {!user && (
               <Link href="/login">
-                <Button variant="outline" size="sm" className="touch-target">Iniciar sesión</Button>
+                <Button variant="outline" size="sm" className="touch-target shrink-0" aria-label="Iniciar sesión">
+                  <LogIn className="h-4 w-4 sm:hidden" aria-hidden />
+                  <span className="hidden sm:inline">Iniciar sesión</span>
+                </Button>
               </Link>
             )}
           </div>
         </div>
       </header>
 
-      <div className="flex flex-1 min-h-0 h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)]">
-        <aside className="hidden lg:flex lg:w-96 border-r border-border bg-card/30 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 h-[calc(100dvh-3.5rem)] min-h-[calc(100vh-3.5rem)] sm:h-[calc(100dvh-4rem)] sm:min-h-[calc(100vh-4rem)]">
+        <aside className="hidden flex-col overflow-hidden border-r border-border bg-card/30 lg:flex lg:w-80 xl:w-96">
           <ListaNodosPanel {...panelProps} />
         </aside>
 
         <main className="flex-1 relative overflow-hidden min-w-0">
           <div className="absolute inset-0 z-0">
             <MapaLeaflet
+              layoutKey={listaAbierta}
               pendulos={filteredPendulos}
               onSelect={(pendulo) => {
                 const penduloUI = pendulosUI.find((p) => p.id === pendulo.id)
@@ -273,13 +285,13 @@ export default function PaginaMapaRed() {
           </div>
 
           {selectedPendulo && (
-            <div className="absolute bottom-0 left-0 right-0 z-[400] p-3 sm:p-4">
-              <Card className="border-border bg-card/98 backdrop-blur-sm shadow-lg">
+            <div className="absolute bottom-0 left-0 right-0 z-[400] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] sm:p-4">
+              <Card className="max-h-[min(50dvh,420px)] overflow-y-auto rounded-t-xl border-border bg-card/98 shadow-lg backdrop-blur-sm sm:rounded-xl">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">{getEstadoBadge(selectedPendulo.estado)}</div>
-                      <CardTitle className="text-base truncate">{selectedPendulo.institucion}</CardTitle>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center gap-2">{getEstadoBadge(selectedPendulo.estado)}</div>
+                      <CardTitle className="truncate text-sm sm:text-base">{selectedPendulo.institucion}</CardTitle>
                       <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                         <MapPin className="w-3 h-3 flex-shrink-0" />
                         {selectedPendulo.ciudad}, {selectedPendulo.pais}

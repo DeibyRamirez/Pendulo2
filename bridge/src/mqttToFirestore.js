@@ -75,6 +75,15 @@ async function handleMessage(topic, message) {
         .doc(usuarioActivo)
         .collection('lecturas')
         .add(lecturaPayload);
+
+      const statsRef = db.collection('configuracion').doc('estadisticas_publicas');
+      await statsRef.set(
+        {
+          experimentosRealizados: admin.firestore.FieldValue.increment(1),
+          actualizadoEn: now,
+        },
+        { merge: true },
+      );
     } catch (err) {
       logger.error(`Error escribiendo lectura historica de ${penduloId}:`, err.message);
     }

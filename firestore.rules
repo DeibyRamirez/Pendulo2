@@ -336,6 +336,9 @@ service cloud.firestore {
     }
 
     // ─── Configuración de la plataforma (plus de evaluación) ─────────────
+    // Landing pública: solo lectura anónima de estadisticas_publicas (dos enteros).
+    // No abrir usuarios al público; la API /api/estadisticas-landing cuenta con Admin SDK.
+    // Escritura del doc: admin, incrementos firmados en registro/práctica, o bridge/Admin.
     match /configuracion/{docId} {
       allow read: if isSignedIn();
 

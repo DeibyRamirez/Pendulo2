@@ -59,7 +59,7 @@ export function usePendulum(
     const applyArm = (theta: number) => {
       const node = arm?.current
       if (!node) return
-      node.style.transform = `translateX(-50%) rotate(${theta}deg)`
+      node.style.transform = `rotate(${theta}deg)`
     }
 
     if (motion === 'off') {
