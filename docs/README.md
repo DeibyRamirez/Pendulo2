@@ -20,6 +20,11 @@ en Microsoft Word, actualice el índice (clic derecho → Actualizar campos).
 
 Para regenerarlos: `cd scripts/documentacion && npm install && npm run generar`.
 
+## Landing (hero y estadísticas)
+
+- [`landing-stats-verificacion.md`](./landing-stats-verificacion.md) — checklist si ves stats
+  estáticas (`500+`) o el hero con guiones sin práctica activa.
+
 ## Runbooks de ingeniería
 
 Índice:

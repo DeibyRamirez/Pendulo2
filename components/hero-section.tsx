@@ -8,12 +8,18 @@ import { usePendulos } from "@/hooks/usePendulos"
 import { usePenduloData } from "@/hooks/usePenduloData"
 import { useReducedMotion } from "@/hooks/useReducedMotion"
 import { QRCodeSVG } from "qrcode.react"
-import { PENDULO_PRINCIPAL_ID } from "@/lib/constantes"
+import {
+  buscarPenduloEnCatalogo,
+  esPracticaEnVivo,
+  maxMuestrasDesdeEnVivo,
+  resolverIdTelemetria,
+} from "@/lib/penduloEnVivo"
 import { PendulumStage, type SignalMode } from "@/components/lab/pendulum-stage"
 import { StatusChip } from "@/components/lab/status-chip"
 import { Skeleton } from "@/components/ui/skeleton"
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pendulo2.vercel.app/"
+const DEMO_PENDULO_ID = "1"
 
 const allies = [
   { name: "UAC", detail: "Corp. Universitaria Autónoma del Cauca" },
@@ -44,30 +50,44 @@ function estadoTone(estado: string) {
 
 export function HeroSection() {
   const { pendulos, loading, error } = usePendulos()
-  const { enVivo, segundosDesdeUltimoDato } = usePenduloData(PENDULO_PRINCIPAL_ID)
+  const penduloDemo = useMemo(
+    () => buscarPenduloEnCatalogo(pendulos, DEMO_PENDULO_ID),
+    [pendulos],
+  )
+  const penduloIdTelemetria = useMemo(
+    () => resolverIdTelemetria(DEMO_PENDULO_ID, penduloDemo),
+    [penduloDemo],
+  )
+  const { enVivo, segundosDesdeUltimoDato } = usePenduloData(penduloIdTelemetria)
   const reduced = useReducedMotion()
   const [index, setIndex] = useState(0)
   const qrSize = useQrSize()
   const touchX = useRef<number | null>(null)
 
-  const liveFresh =
-    enVivo?.estado === "en_progreso" &&
-    segundosDesdeUltimoDato != null &&
-    segundosDesdeUltimoDato < 45
-
-  const dropped =
-    enVivo?.estado === "error" ||
-    (enVivo?.estado === "en_progreso" &&
-      segundosDesdeUltimoDato != null &&
-      segundosDesdeUltimoDato >= 45)
+  const hayDatosEnVivo = esPracticaEnVivo(enVivo, segundosDesdeUltimoDato)
+  const maxMuestras = maxMuestrasDesdeEnVivo(enVivo)
 
   let signal: SignalMode = "demo"
-  if (dropped) signal = "sin_senal"
-  else if (liveFresh) signal = "en_vivo"
+  if (enVivo?.estado === "error") {
+    signal = "sin_senal"
+  } else if (enVivo?.estado === "en_progreso") {
+    signal = hayDatosEnVivo ? "en_vivo" : "sin_senal"
+  }
   if (reduced && signal !== "sin_senal") signal = "pausado"
 
   const measuredPeriod =
-    liveFresh && typeof enVivo?.periodo === "number" ? enVivo.periodo : undefined
+    hayDatosEnVivo && typeof enVivo?.periodo === "number" ? enVivo.periodo : undefined
+
+  const telemetriaEnVivo =
+    signal === "en_vivo"
+      ? {
+          temperatura: typeof enVivo?.temperatura === "number" ? enVivo.temperatura : undefined,
+          periodo: typeof enVivo?.periodo === "number" ? enVivo.periodo : undefined,
+          muestras: typeof enVivo?.muestras === "number" ? enVivo.muestras : undefined,
+          maxMuestras,
+          gravedad: typeof enVivo?.gravedad === "number" ? enVivo.gravedad : undefined,
+        }
+      : undefined
 
   const items = useMemo(
     () =>
@@ -88,7 +108,8 @@ export function HeroSection() {
   }, [items.length])
 
   const selected = items.length > 0 ? items[index % items.length] : null
-  const chipTone = signal === "en_vivo" ? "ok" : signal === "sin_senal" ? "error" : signal === "pausado" ? "pause" : "demo"
+  const chipTone =
+    signal === "en_vivo" ? "ok" : signal === "sin_senal" ? "error" : signal === "pausado" ? "pause" : "demo"
   const chipLabel =
     signal === "en_vivo"
       ? "EN VIVO · LABORATORIO UAC"
@@ -121,15 +142,18 @@ export function HeroSection() {
                 </span>
               </span>
             </h1>
-            <p className="hero-rise max-w-[42ch] text-destacado leading-[1.45] text-muted-foreground" style={{ animationDelay: ".35s" }}>
-              Accede al péndulo físico de la Corporación Universitaria Autónoma del Cauca
-              desde cualquier lugar del mundo. Visualiza datos en tiempo real, agenda sesiones
-              experimentales y forma parte de la red global de laboratorios remotos.
+            <p
+              className="hero-rise max-w-[42ch] text-destacado leading-[1.45] text-muted-foreground"
+              style={{ animationDelay: ".35s" }}
+            >
+              Accede al péndulo físico de la Corporación Universitaria Autónoma del Cauca desde cualquier
+              lugar del mundo. Visualiza datos en tiempo real, agenda sesiones experimentales y forma parte
+              de la red global de laboratorios remotos.
             </p>
           </div>
 
           <div id="pendulo" className="scroll-mt-24 md:col-start-2 md:row-span-2 md:row-start-1">
-            <PendulumStage signal={signal} period={measuredPeriod} />
+            <PendulumStage signal={signal} period={measuredPeriod} telemetriaEnVivo={telemetriaEnVivo} />
           </div>
 
           <div className="flex flex-col gap-8 md:col-start-1 md:row-start-2">
@@ -141,10 +165,10 @@ export function HeroSection() {
                 </Link>
               </Button>
               <Button size="lg" variant="ghost" asChild>
-                <a href="#pendulo">
+                <Link href="/pendulo/1">
                   <Play className="mr-2 h-4 w-4" />
                   Ver demostración
-                </a>
+                </Link>
               </Button>
             </div>
 
@@ -172,7 +196,11 @@ export function HeroSection() {
           </p>
 
           {loading ? (
-            <div className="grid gap-6 rounded-[1.4rem] border border-border bg-card p-6 sm:grid-cols-[140px_1fr]" aria-busy="true" aria-label="Cargando péndulos">
+            <div
+              className="grid gap-6 rounded-[1.4rem] border border-border bg-card p-6 sm:grid-cols-[140px_1fr]"
+              aria-busy="true"
+              aria-label="Cargando péndulos"
+            >
               <Skeleton className="mx-auto size-[140px]" />
               <div className="space-y-3">
                 <Skeleton className="h-3 w-24" />
@@ -222,37 +250,51 @@ export function HeroSection() {
                 }}
               >
                 <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-                  <Link href={`/pendulo/${selected.id}`} className="shrink-0 rounded-md bg-white p-3" aria-label={`Abrir péndulo de ${selected.institucion}`}>
+                  <Link
+                    href={`/pendulo/${selected.id}`}
+                    className="shrink-0 rounded-md bg-white p-3"
+                    aria-label={`Abrir péndulo de ${selected.institucion}`}
+                  >
                     <QRCodeSVG value={`${baseUrl}/pendulo/${selected.id}`} size={qrSize} level="M" />
                   </Link>
                   <div className="grid w-full flex-1 grid-cols-2 gap-x-6 gap-y-5">
                     <div className="col-span-2">
-                      <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">Institución</p>
+                      <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">
+                        Institución
+                      </p>
                       <p className="mt-1 font-display text-lg font-medium text-foreground">{selected.institucion}</p>
                     </div>
                     <div>
-                      <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">Estado</p>
+                      <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">
+                        Estado
+                      </p>
                       <p className="mt-1 flex items-center gap-2 text-foreground">
                         <span className={`size-1.5 rounded-full ${estadoTone(selected.estado)}`} />
                         <span className="num text-sm">{selected.estado.replaceAll("_", " ")}</span>
                       </p>
                     </div>
                     <div>
-                      <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">País</p>
+                      <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">
+                        País
+                      </p>
                       <p className="num mt-1 text-sm text-foreground">{selected.pais}</p>
                     </div>
                     <div>
-                      <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">Latitud</p>
+                      <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">
+                        Latitud
+                      </p>
                       <p className="num mt-1 whitespace-nowrap text-sm text-foreground">{selected.latitud}</p>
                     </div>
                     <div>
-                      <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">Longitud</p>
+                      <p className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">
+                        Longitud
+                      </p>
                       <p className="num mt-1 whitespace-nowrap text-sm text-foreground">{selected.longitud}</p>
                     </div>
                   </div>
                 </div>
                 <p className="num mt-6 text-center text-[.6875rem] tracking-[.14em] text-muted-foreground">
-                  {String(index % items.length + 1).padStart(1, "0")} / {items.length}
+                  {String((index % items.length) + 1).padStart(1, "0")} / {items.length}
                 </p>
               </div>
 

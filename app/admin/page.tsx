@@ -32,6 +32,7 @@ import {
   escucharUsuarios,
 } from "@/app/services/usuarioService";
 import { escucharTodasReservaciones } from "@/app/services/reservacionService";
+import { recalcularEstadisticasPublicasDesdeAdmin } from "@/app/services/estadisticasPublicasService";
 import { DiagnosticoPenduloAdmin } from "@/components/diagnostico-pendulo-admin";
 import { Switch } from "@/components/ui/switch";
 import { useModuloEvaluacion } from "@/hooks/useModuloEvaluacion";
@@ -66,6 +67,7 @@ interface Reservacion {
   usuario_id: string;
   inicio_sesion_reserva: { toDate: () => Date } | Date;
   estado: EstadoReserva;
+  practicas_realizadas?: number;
 }
 
 const ESTADOS_PENDULO: EstadoPendulo[] = ["Activo", "Inactivo", "En_uso", "En_mantenimiento"];
@@ -84,6 +86,7 @@ export default function DashboardAdminPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [reservaciones, setReservaciones] = useState<Reservacion[]>([]);
   const [savingPendulo, setSavingPendulo] = useState(false);
+  const [recalculandoStatsPublicas, setRecalculandoStatsPublicas] = useState(false);
   const [editingPenduloId, setEditingPenduloId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"pendulos" | "usuarios" | "reservas">("pendulos");
@@ -293,8 +296,32 @@ export default function DashboardAdminPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><BarChart3 className="w-5 h-5" /> Resumen de uso</CardTitle>
-              <CardDescription>Métricas globales del sistema</CardDescription>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><BarChart3 className="w-5 h-5" /> Resumen de uso</CardTitle>
+                  <CardDescription>Métricas globales del sistema</CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={recalculandoStatsPublicas}
+                  onClick={async () => {
+                    setRecalculandoStatsPublicas(true);
+                    try {
+                      await recalcularEstadisticasPublicasDesdeAdmin(usuarios, reservaciones);
+                    } catch (err) {
+                      console.error(err);
+                      setError("No se pudieron recalcular las estadísticas públicas de la landing.");
+                    } finally {
+                      setRecalculandoStatsPublicas(false);
+                    }
+                  }}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${recalculandoStatsPublicas ? "animate-spin" : ""}`} />
+                  Recalcular estadísticas públicas
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="grid md:grid-cols-3 gap-4">
               <div className="rounded-lg border border-border p-4">

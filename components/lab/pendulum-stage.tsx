@@ -13,7 +13,7 @@ const chip: Record<SignalMode, { tone: 'ok' | 'demo' | 'error' | 'pause'; label:
   en_vivo: {
     tone: 'ok',
     label: 'EN VIVO · LABORATORIO UAC',
-    note: 'Período medido · θ(t) del mismo modelo',
+    note: 'Telemetría del péndulo físico · temperatura, período, oscilaciones y gravedad',
   },
   demo: {
     tone: 'demo',
@@ -64,12 +64,27 @@ function Sparkline({ samples }: { samples: number[] }) {
   )
 }
 
+export type TelemetriaEnVivoStage = {
+  temperatura?: number
+  periodo?: number
+  muestras?: number
+  maxMuestras?: number
+  gravedad?: number
+}
+
+function formatLive(value: number | undefined, digits: number) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '— —'
+  return value.toFixed(digits)
+}
+
 export function PendulumStage({
   signal,
   period,
+  telemetriaEnVivo,
 }: {
   signal: SignalMode
   period?: number
+  telemetriaEnVivo?: TelemetriaEnVivoStage
 }) {
   const armRef = useRef<HTMLDivElement>(null)
   const motion: PendulumMotion = signal === 'sin_senal' ? 'off' : signal === 'pausado' ? 'still' : 'run'
@@ -79,6 +94,7 @@ export function PendulumStage({
   const angle = silent ? '— —' : formatSigned(frame.theta, 1)
   const speed = silent ? '— —' : formatSigned(frame.velocity, 2)
   const periodText = silent ? '— —' : frame.period.toFixed(2)
+  const liveReadouts = signal === 'en_vivo' && telemetriaEnVivo
 
   return (
     <div className="relative">
@@ -126,10 +142,40 @@ export function PendulumStage({
           <Sparkline samples={frame.samples} />
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-2 md:gap-3">
-        <Readout label="Ángulo" value={angle} unit={silent ? undefined : '°'} />
-        <Readout label="Velocidad" value={speed} unit={silent ? undefined : 'm/s'} />
-        <Readout label="Período" value={periodText} unit={silent ? undefined : 's'} />
+      <div className={`mt-3 grid gap-2 md:gap-3 ${liveReadouts ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+        {liveReadouts ? (
+          <>
+            <Readout
+              label="Temperatura"
+              value={formatLive(telemetriaEnVivo.temperatura, 2)}
+              unit={telemetriaEnVivo.temperatura != null ? '°C' : undefined}
+            />
+            <Readout
+              label="Período"
+              value={formatLive(telemetriaEnVivo.periodo, 3)}
+              unit={telemetriaEnVivo.periodo != null ? 's' : undefined}
+            />
+            <Readout
+              label="Oscilaciones"
+              value={
+                typeof telemetriaEnVivo.muestras === 'number'
+                  ? `${telemetriaEnVivo.muestras}/${telemetriaEnVivo.maxMuestras ?? '—'}`
+                  : '— —'
+              }
+            />
+            <Readout
+              label="Gravedad"
+              value={formatLive(telemetriaEnVivo.gravedad, 3)}
+              unit={telemetriaEnVivo.gravedad != null ? 'm/s²' : undefined}
+            />
+          </>
+        ) : (
+          <>
+            <Readout label="Ángulo" value={angle} unit={silent ? undefined : '°'} />
+            <Readout label="Velocidad" value={speed} unit={silent ? undefined : 'm/s'} />
+            <Readout label="Período" value={periodText} unit={silent ? undefined : 's'} />
+          </>
+        )}
       </div>
       <p className="mt-2 font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">{meta.note}</p>
     </div>

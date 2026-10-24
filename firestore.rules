@@ -335,16 +335,51 @@ service cloud.firestore {
       }
     }
 
+    function estadisticasPublicasValidas(data) {
+      return data.estudiantesRegistrados is int
+        && data.estudiantesRegistrados >= 0
+        && data.experimentosRealizados is int
+        && data.experimentosRealizados >= 0;
+    }
+
+    function incrementoEstadisticaPublica(campo) {
+      return isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([campo, 'actualizadoEn'])
+        && request.resource.data[campo] is int
+        && request.resource.data[campo] == int(resource.data.get(campo, 0)) + 1;
+    }
+
+    function creacionInicialEstadisticaPublica(campo) {
+      return isSignedIn()
+        && request.resource.data.keys().hasOnly([campo, 'actualizadoEn'])
+        && request.resource.data[campo] == 1;
+    }
+
     // ─── Configuración de la plataforma (plus de evaluación) ─────────────
     // Landing pública: solo lectura anónima de estadisticas_publicas (dos enteros).
     // No abrir usuarios al público; la API /api/estadisticas-landing cuenta con Admin SDK.
     // Escritura del doc: admin, incrementos firmados en registro/práctica, o bridge/Admin.
     match /configuracion/{docId} {
-      allow read: if isSignedIn();
+      allow read: if docId == "estadisticas_publicas" || isSignedIn();
 
       allow create, update: if isAdmin()
         && docId == "app"
         && request.resource.data.modulo_evaluacion is bool;
+
+      allow create: if docId == "estadisticas_publicas"
+        && (
+          (isAdmin() && estadisticasPublicasValidas(request.resource.data))
+          || creacionInicialEstadisticaPublica('estudiantesRegistrados')
+          || creacionInicialEstadisticaPublica('experimentosRealizados')
+        );
+
+      allow update: if docId == "estadisticas_publicas"
+        && (
+          (isAdmin() && estadisticasPublicasValidas(request.resource.data))
+          || incrementoEstadisticaPublica('estudiantesRegistrados')
+          || incrementoEstadisticaPublica('experimentosRealizados')
+        );
 
       allow delete: if false;
     }

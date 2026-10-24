@@ -27,7 +27,14 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { incrementarEstudianteRegistrado } from './estadisticasPublicasService';
 import { normalizeRole } from '@/lib/roles';
+
+function notificarEstudianteRegistradoEnLanding() {
+  incrementarEstudianteRegistrado().catch((err) => {
+    console.warn('No se pudo actualizar contador público de estudiantes:', err);
+  });
+}
 
 export function validarDominioInstitucional(email) {
   return (email || '').toLowerCase().endsWith('.edu.co');
@@ -135,6 +142,8 @@ export async function registrarUsuario(email, password, nombre, institucion) {
     institucion: institucion,
   });
 
+  notificarEstudianteRegistradoEnLanding();
+
   return credencial;
 }
 
@@ -187,6 +196,7 @@ export async function completarRegistroGoogle({ uid, email, nombre, institucion,
     fotoURL: fotoURL || usuario.photoURL || null,
     proveedor: 'google',
   });
+  notificarEstudianteRegistradoEnLanding();
   return { uid: uidFinal, email: emailFinal, rol: 'Estudiante', institucion };
 }
 

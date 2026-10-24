@@ -14,6 +14,7 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { incrementarExperimentoRealizado } from './estadisticasPublicasService';
 
 /**
  * ID determinístico del slot: pendulo + fecha/hora de inicio (30 min fijos).
@@ -306,6 +307,10 @@ export async function iniciarPractica({ reservacionId, penduloId, usuarioId }) {
       const slotRef = doc(db, 'slots_ocupados', reservacion.slot_id);
       transaction.update(slotRef, { estado: 'active' });
     }
+  });
+
+  incrementarExperimentoRealizado().catch((err) => {
+    console.warn('No se pudo actualizar contador público de experimentos:', err);
   });
 
   return { practicaId, practicaInicio };
