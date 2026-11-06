@@ -1,5 +1,8 @@
 // app/api/chat/route.ts
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { getAuth } from "firebase-admin/auth";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import { MODEL_CONFIG, PHYSICS_SYSTEM_PROMPT } from "@/lib/physics-context";
