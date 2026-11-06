@@ -77,7 +77,7 @@ export default function AgenteIAPage() {
               Physics AI
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Tutor especializado en Física · Gemini 1.5 Flash
+              Tutor especializado en Física · Gemini 3.5 Flash-Lite
             </p>
           </div>
         </div>

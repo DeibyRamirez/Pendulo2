@@ -85,7 +85,7 @@ CONTEXTO DE CONVERSACIÓN
 
 // lib/physics-context.ts  — solo cambia MODEL_CONFIG
 export const MODEL_CONFIG = {
-  model: "gemini-2.5-flash-lite",  // ← sufijo de versión requerido en Vertex
+  model: "gemini-3.5-flash-lite",  // ← sufijo de versión requerido en Vertex
   maxOutputTokens: 1024,
   temperature: 0.4,
   topP: 0.8,
