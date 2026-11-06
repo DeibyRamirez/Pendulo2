@@ -15,8 +15,6 @@ interface RequestBody {
 }
 
 // ─── Autenticación (Firebase Admin) ───
-// La cuenta de servicio (GOOGLE_SERVICE_ACCOUNT_JSON) o ADC pertenece al mismo
-// proyecto que Firebase Auth, así que verifyIdToken valida los ID tokens web.
 function obtenerAuthAdmin() {
   return getAuth(getAdminApp());
 }
@@ -28,14 +26,13 @@ async function obtenerUidAutenticado(request: Request): Promise<string | null> {
   try {
     const decodificado = await obtenerAuthAdmin().verifyIdToken(token);
     return decodificado.uid;
-  } catch {
+  } catch (err) {
+    console.error("verifyIdToken falló:", err);
     return null;
   }
 }
 
-// ─── Límite en memoria por usuario ───
-// En serverless cada instancia tiene su propia memoria: esto NO es un límite
-// global, solo frena ráfagas dentro de la misma instancia.
+// ─── Límite en memoria por usuario (solo por instancia) ───
 const LIMITE_MENSAJES = 20;
 const VENTANA_LIMITE_MS = 10 * 60 * 1000;
 const MAX_LONGITUD_MENSAJE = 2000;
@@ -57,39 +54,37 @@ function superaLimite(uid: string): boolean {
   return false;
 }
 
-// ─── Obtener Access Token usando Application Default Credentials ───
+// ─── Access Token ───
 async function getAccessToken(): Promise<string> {
-  // En Cloud Run / GKE / App Engine: ADC funciona automáticamente.
-  // En local: usa `gcloud auth application-default login` o
-  //           la variable GOOGLE_APPLICATION_CREDENTIALS apuntando al JSON.
-
   const metadataUrl =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
-  // 1. Intenta el metadata server (entorno GCP)
   try {
     const res = await fetch(metadataUrl, {
       headers: { "Metadata-Flavor": "Google" },
-      signal: AbortSignal.timeout(1000), // 1 s de timeout
+      signal: AbortSignal.timeout(1000),
     });
     if (res.ok) {
       const data = await res.json();
       return data.access_token as string;
     }
   } catch {
-    // No estamos en GCP — caemos al método de Service Account
+    // No estamos en GCP
   }
 
-  // 2. Fallback: Service Account JSON desde variable de entorno
   const saJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!saJson) {
     throw new Error(
-      "No se encontró credencial. " +
-        "Configura GOOGLE_SERVICE_ACCOUNT_JSON o usa ADC en GCP."
+      "No se encontró credencial. Configura GOOGLE_SERVICE_ACCOUNT_JSON o usa ADC en GCP."
     );
   }
 
-  const sa = JSON.parse(saJson);
+  let sa;
+  try {
+    sa = JSON.parse(saJson);
+  } catch {
+    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON no es un JSON válido (debe ir en una sola línea).");
+  }
   return await getTokenFromServiceAccount(sa);
 }
 
@@ -102,7 +97,6 @@ async function getTokenFromServiceAccount(sa: {
   const now = Math.floor(Date.now() / 1000);
   const tokenUri = sa.token_uri ?? "https://oauth2.googleapis.com/token";
 
-  // Header y payload del JWT
   const header = { alg: "RS256", typ: "JWT" };
   const payload = {
     iss: sa.client_email,
@@ -121,8 +115,8 @@ async function getTokenFromServiceAccount(sa: {
 
   const signingInput = `${encode(header)}.${encode(payload)}`;
 
-  // Importar la clave privada PEM
   const pemBody = sa.private_key
+    .replace(/\\n/g, "\n")
     .replace(/-----BEGIN PRIVATE KEY-----/, "")
     .replace(/-----END PRIVATE KEY-----/, "")
     .replace(/\s/g, "");
@@ -150,7 +144,6 @@ async function getTokenFromServiceAccount(sa: {
       .replace(/\//g, "_")
       .replace(/=+$/, "");
 
-  // Intercambiar JWT por Access Token
   const tokenRes = await fetch(tokenUri, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -169,10 +162,21 @@ async function getTokenFromServiceAccount(sa: {
   return tokenData.access_token as string;
 }
 
+// ─── URL de Vertex según ubicación ───
+function construirVertexUrl(projectId: string, location: string, modelId: string): string {
+  const host =
+    location === "global"
+      ? "aiplatform.googleapis.com"
+      : `${location}-aiplatform.googleapis.com`;
+  return (
+    `https://${host}/v1/projects/${projectId}/locations/${location}/` +
+    `publishers/google/models/${modelId}:generateContent`
+  );
+}
+
 // ─── POST /api/chat ───
 export async function POST(request: Request) {
   try {
-    // 1. Autenticación: solo ID tokens válidos de Firebase.
     const uid = await obtenerUidAutenticado(request);
     if (!uid) {
       return NextResponse.json(
@@ -181,18 +185,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validar body
     const body: RequestBody = await request.json();
-    if (
-      !body.messages ||
-      !Array.isArray(body.messages) ||
-      body.messages.length === 0
-    ) {
+    if (!body.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
       return NextResponse.json(
-        {
-          error:
-            "El campo 'messages' es obligatorio y debe ser un array no vacío.",
-        },
+        { error: "El campo 'messages' es obligatorio y debe ser un array no vacío." },
         { status: 400 }
       );
     }
@@ -212,14 +208,11 @@ export async function POST(request: Request) {
     );
     if (mensajeInvalido) {
       return NextResponse.json(
-        {
-          error: `Cada mensaje debe ser texto de máximo ${MAX_LONGITUD_MENSAJE} caracteres.`,
-        },
+        { error: `Cada mensaje debe ser texto de máximo ${MAX_LONGITUD_MENSAJE} caracteres.` },
         { status: 400 }
       );
     }
 
-    // 2. Límite simple por usuario (ver nota de memoria por instancia).
     if (superaLimite(uid)) {
       return NextResponse.json(
         {
@@ -229,9 +222,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Variables de entorno requeridas
     const projectId = process.env.VERTEX_PROJECT_ID;
-    const location = process.env.VERTEX_LOCATION ?? "us-central1";
+    const location = process.env.VERTEX_LOCATION ?? "global";
 
     if (!projectId) {
       return NextResponse.json(
@@ -240,20 +232,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Obtener access token
     const accessToken = await getAccessToken();
 
-    // Convertir historial al formato Vertex AI (igual que Gemini)
     const contents = body.messages.map((msg) => ({
       role: msg.role === "assistant" ? "model" : "user",
       parts: [{ text: msg.content }],
     }));
 
-    // Payload para Vertex AI — idéntico a Gemini salvo el endpoint
     const vertexPayload = {
-      systemInstruction: {
-        parts: [{ text: PHYSICS_SYSTEM_PROMPT }],
-      },
+      systemInstruction: { parts: [{ text: PHYSICS_SYSTEM_PROMPT }] },
       contents,
       generationConfig: {
         maxOutputTokens: MODEL_CONFIG.maxOutputTokens,
@@ -263,13 +250,8 @@ export async function POST(request: Request) {
       },
     };
 
-    // Modelo: Vertex AI usa "gemini-2.0-flash-001" (con sufijo de versión)
-    const modelId = MODEL_CONFIG.model; // Ej: "gemini-2.5-flash-lite"
-
-    const vertexUrl =
-      `https://${location}-aiplatform.googleapis.com/v1/` +
-      `projects/${projectId}/locations/${location}/` +
-      `publishers/google/models/${modelId}:generateContent`;
+    const modelId = MODEL_CONFIG.model; // "gemini-3.5-flash-lite"
+    const vertexUrl = construirVertexUrl(projectId, location, modelId);
 
     const vertexRes = await fetch(vertexUrl, {
       method: "POST",
@@ -281,27 +263,29 @@ export async function POST(request: Request) {
     });
 
     if (!vertexRes.ok) {
-      const errData = await vertexRes.json();
-      console.error("Error en Vertex AI:", errData);
-      return NextResponse.json(
-        {
-          error:
-            errData?.error?.message ?? `Error HTTP ${vertexRes.status}`,
-        },
-        { status: vertexRes.status }
-      );
+      // Leer como texto: Vertex puede responder HTML (404) en vez de JSON
+      const raw = await vertexRes.text();
+      let mensaje = `Error HTTP ${vertexRes.status}`;
+      try {
+        mensaje = JSON.parse(raw)?.error?.message ?? mensaje;
+      } catch {
+        // respuesta no JSON
+      }
+      console.error("Error en Vertex AI:", vertexRes.status, vertexUrl, raw.slice(0, 500));
+      return NextResponse.json({ error: mensaje }, { status: vertexRes.status });
     }
 
     const vertexData = await vertexRes.json();
     const text: string =
-      vertexData.candidates?.[0]?.content?.parts?.[0]?.text ??
-      "Lo siento, no pude generar una respuesta.";
+      vertexData.candidates?.[0]?.content?.parts
+        ?.map((p: { text?: string }) => p.text ?? "")
+        .join("") || "Lo siento, no pude generar una respuesta.";
 
     return NextResponse.json({ reply: text });
   } catch (error) {
     console.error("Error en /api/chat:", error);
     return NextResponse.json(
-      { error: "Error interno del servidor." },
+      { error: error instanceof Error ? error.message : "Error interno del servidor." },
       { status: 500 }
     );
   }
