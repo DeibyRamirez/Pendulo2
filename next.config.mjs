@@ -6,7 +6,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  serverExternalPackages: ['firebase-admin'],
+  serverExternalPackages: ['firebase-admin', 'jose'],
 }
 
 export default nextConfig
