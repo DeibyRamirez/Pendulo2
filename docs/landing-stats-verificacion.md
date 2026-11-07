@@ -139,6 +139,7 @@ curl http://localhost:3000/api/estadisticas-landing
 | Universidades | Número real desde `pendulos` (p. ej. 1) |
 | Experimentos (muestras globales) / estudiantes (usuarios totales) | API + doc público; `0` solo si fallan API y doc vacío |
 | Disponibilidad | `99.9%` fijo |
+| `/pendulo-publico` | Misma telemetría que `/pendulo/UAC-01` (`VistaPublicaPendulo`), sin gráfica simulada |
 
 ## 7. Causas menos frecuentes
 

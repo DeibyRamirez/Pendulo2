@@ -34,10 +34,9 @@ export interface PendulumChartDataPoint {
 
 interface PendulumChartProps {
   /**
-   * Datos reales (ej. provenientes de Firestore vía usePenduloData). Si se
-   * provee, se muestran tal cual y NO se genera/simula nada localmente.
-   * Si se omite, el componente cae de vuelta a datos de demostración
-   * (usado en vistas públicas/preview sin sesión activa).
+   * Solo demostración visual (ángulo/velocidad simulados). Para telemetría real
+   * usa {@link VistaPublicaPendulo} o la ruta `/pendulo/[id]`.
+   * Si se pasa `data`, se muestra tal cual; si no, simula ondas localmente.
    */
   data?: PendulumChartDataPoint[]
 }

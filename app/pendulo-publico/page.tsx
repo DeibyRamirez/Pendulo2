@@ -1,29 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LogIn, QrCode } from "lucide-react";
 import Link from "next/link";
-import { PendulumChart } from "@/components/pendulum-chart";
-import { CameraStream } from "@/components/camera-stream";
 import { IconoPendulo } from "@/components/IconoPendulo";
 import { NOMBRE_PROYECTO, SIGLA_PROYECTO } from "@/lib/marca";
-import { IndicadoresUltimaPrueba } from "@/components/IndicadoresUltimaPrueba";
 import { PENDULO_PRINCIPAL_ID } from "@/lib/constantes";
+import { VistaPublicaPendulo } from "@/components/vista-publica-pendulo";
+import { QRCodeSVG } from "qrcode.react";
+
+const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
+const qrUrl = `${baseUrl}/pendulo-publico`;
 
 export default function PublicPendulumPage() {
-  const [qrCode, setQrCode] = useState<string>("");
-
-  useEffect(() => {
-    // Generar QR usando una librería como qrcode.react
-    // Por ahora, mostrar placeholder
-    setQrCode("QR_CODE_PLACEHOLDER");
-  }, []);
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Navbar Pública */}
       <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="inline-flex items-center gap-3">
@@ -35,7 +27,7 @@ export default function PublicPendulumPage() {
               <p className="text-xs text-muted-foreground">{NOMBRE_PROYECTO}</p>
             </div>
           </Link>
-          
+
           <Link href="/login">
             <Button>
               <LogIn className="w-4 h-4 mr-2" />
@@ -45,126 +37,63 @@ export default function PublicPendulumPage() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-bold text-foreground mb-3">
-            Péndulo Remoto - Corporación Universitaria Autónoma del Cauca
+            Péndulo remoto — {PENDULO_PRINCIPAL_ID}
           </h1>
           <p className="text-lg text-muted-foreground">
-            Visualiza los datos en tiempo real del péndulo físico sin necesidad de iniciar sesión
+            Telemetría en tiempo real desde Firestore, sin iniciar sesión
           </p>
         </div>
 
-        {/* Grid de contenido */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Sección principal: Vista en Vivo */}
-          <div className="lg:col-span-2">
-            <Card className="border-border/50">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Péndulo en Vivo</CardTitle>
-                    <CardDescription>Datos en tiempo real del sistema</CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-[var(--color-niebla)]" />
-                    <span className="font-mono text-[.6875rem] uppercase tracking-[.14em] text-muted-foreground">Demostración</span>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <PendulumChart />
-                <div className="mt-6 pt-6 border-t border-border">
-                  <IndicadoresUltimaPrueba />
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="mt-6">
-              <CameraStream penduloId={PENDULO_PRINCIPAL_ID} />
-            </div>
-
-            {/* Información del Péndulo */}
-            <Card className="border-border/50 mt-6">
-              <CardHeader>
-                <CardTitle>Información del Péndulo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center py-2 border-b border-border">
-                    <span className="text-muted-foreground">Estado</span>
-                    <span className="font-medium flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[var(--color-niebla)]" />
-                      Según la última medición
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-border">
-                    <span className="text-muted-foreground">Institución</span>
-                    <span className="font-medium">Corporación Universitaria Autónoma del Cauca</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-border">
-                    <span className="text-muted-foreground">Ubicación</span>
-                    <span className="font-medium">Popayán, Colombia</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-muted-foreground">Gráfica</span>
-                    <span className="font-medium">Modelo de demostración</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+          <div className="lg:col-span-3">
+            <VistaPublicaPendulo catalogId={PENDULO_PRINCIPAL_ID} />
           </div>
 
-          {/* Sidebar: QR y Acceso Rápido */}
           <div className="space-y-6">
-            {/* Card QR */}
             <Card className="border-border/50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <QrCode className="w-5 h-5" />
                   Código QR
                 </CardTitle>
-                <CardDescription>
-                  Escanea para acceder a esta página
-                </CardDescription>
+                <CardDescription>Escanea para acceder a esta página</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col items-center">
-                <div className="w-40 h-40 bg-muted rounded-lg flex items-center justify-center border-2 border-dashed border-border mb-4">
-                  <div className="text-center">
-                    <QrCode className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">QR Code</p>
-                  </div>
+                <div className="rounded-lg border border-border bg-background p-4 mb-4">
+                  <QRCodeSVG value={qrUrl} size={160} level="M" />
                 </div>
-                <Button variant="outline" className="w-full" size="sm">
-                  Descargar QR
+                <p className="text-xs text-muted-foreground text-center break-all mb-4">{qrUrl}</p>
+                <Button variant="outline" className="w-full" size="sm" asChild>
+                  <a href={qrUrl} download={`qr-${PENDULO_PRINCIPAL_ID}.png`}>
+                    Abrir enlace
+                  </a>
                 </Button>
               </CardContent>
             </Card>
 
-            {/* Card de Acceso */}
             <Card className="border-border/50 bg-primary/5">
               <CardHeader>
-                <CardTitle className="text-lg">Acceso Completo</CardTitle>
+                <CardTitle className="text-lg">Acceso completo</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Inicia sesión para acceder a todas las funcionalidades: agendamiento, historial y más datos detallados.
+                  Inicia sesión para agendar sesiones, ver historial y más datos detallados.
                 </p>
                 <Link href="/login" className="w-full block">
                   <Button className="w-full">
                     <LogIn className="w-4 h-4 mr-2" />
-                    Iniciar Sesión
+                    Iniciar sesión
                   </Button>
                 </Link>
               </CardContent>
             </Card>
 
-            {/* Card de Información */}
             <Card className="border-border/50">
               <CardHeader>
-                <CardTitle className="text-lg">¿Nuevo Usuario?</CardTitle>
+                <CardTitle className="text-lg">¿Nuevo usuario?</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
@@ -172,52 +101,13 @@ export default function PublicPendulumPage() {
                 </p>
                 <Link href="/registro" className="w-full block">
                   <Button variant="outline" className="w-full">
-                    Crear Cuenta
+                    Crear cuenta
                   </Button>
                 </Link>
               </CardContent>
             </Card>
           </div>
         </div>
-
-        {/* Características */}
-        <Card className="border-border/50 bg-card/30 mb-8">
-          <CardHeader>
-            <CardTitle>Características de la Plataforma</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-lg">📊</span>
-                </div>
-                <h3 className="font-medium text-foreground mb-2">Datos en Tiempo Real</h3>
-                <p className="text-sm text-muted-foreground">Visualiza ángulo, velocidad y oscilaciones</p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-lg">📅</span>
-                </div>
-                <h3 className="font-medium text-foreground mb-2">Agendamiento</h3>
-                <p className="text-sm text-muted-foreground">Reserva sesiones de hasta 30 minutos</p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-lg">📈</span>
-                </div>
-                <h3 className="font-medium text-foreground mb-2">Historial</h3>
-                <p className="text-sm text-muted-foreground">Accede a datos de sesiones anteriores</p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-lg">🗺️</span>
-                </div>
-                <h3 className="font-medium text-foreground mb-2">Red Global</h3>
-                <p className="text-sm text-muted-foreground">Conecta con péndulos de otras universidades</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </main>
     </div>
   );
